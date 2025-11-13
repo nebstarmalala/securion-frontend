@@ -12,15 +12,35 @@ class AuthService {
    * Rate limited: 5 attempts per minute
    */
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    const response = await apiClient.post<ApiResponse<LoginResponse>>("/auth/login", credentials)
+    // Login endpoint returns: { success, message, data: { token, token_type, user } }
+    const response = await apiClient.post<{
+      success: boolean
+      message: string
+      data: {
+        token: string
+        token_type: string
+        user: ApiUser
+      }
+    }>("/auth/login", credentials)
 
-    if (response.success && response.data) {
-      // Store the token
-      apiClient.setToken(response.data.token)
-      return response.data
+    // Validate response structure
+    if (!response.data || !response.data.token) {
+      throw new Error("Invalid response structure: missing token")
     }
 
-    throw new Error(response.message || "Login failed")
+    if (!response.data.user) {
+      throw new Error("Invalid response structure: missing user")
+    }
+
+    // Store the token
+    apiClient.setToken(response.data.token)
+
+    // Return in expected format
+    return {
+      token: response.data.token,
+      token_type: response.data.token_type,
+      user: response.data.user,
+    }
   }
 
   /**
@@ -28,7 +48,8 @@ class AuthService {
    */
   async logout(): Promise<void> {
     try {
-      await apiClient.post<ApiResponse>("/auth/logout")
+      // Logout endpoint returns {message: "Successfully logged out"} directly
+      await apiClient.post<{ message: string }>("/auth/logout")
     } catch (error) {
       // Continue with logout even if API call fails
       console.error("Logout API error:", error)
@@ -43,12 +64,7 @@ class AuthService {
    */
   async getCurrentUser(): Promise<ApiUser> {
     const response = await apiClient.get<ApiResponse<ApiUser>>("/auth/user")
-
-    if (response.success && response.data) {
-      return response.data
-    }
-
-    throw new Error(response.message || "Failed to get current user")
+    return response.data
   }
 
   /**
@@ -70,7 +86,7 @@ class AuthService {
    */
   hasPermission(user: ApiUser | null, permission: string): boolean {
     if (!user) return false
-    return user.permissions.some((p) => p.name === permission)
+    return user.permissions.some((p: { name: string }) => p.name === permission)
   }
 
   /**
@@ -78,7 +94,7 @@ class AuthService {
    */
   hasRole(user: ApiUser | null, roleName: string): boolean {
     if (!user) return false
-    return user.roles.some((r) => r.name === roleName)
+    return user.roles.some((r: { name: string }) => r.name === roleName)
   }
 
   /**
