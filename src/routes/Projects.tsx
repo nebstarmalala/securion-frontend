@@ -1,45 +1,37 @@
 import { DashboardLayout } from "@/components/dashboard-layout"
-import { ProtectedRoute } from "@/components/protected-route"
 import { ProjectCard } from "@/components/project-card"
 import { NewProjectDialog } from "@/components/new-project-dialog"
+import { EmptyState } from "@/components/empty-state"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { projectsService } from "@/lib/api"
-import { Search, AlertCircle } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useQueryClient } from "@tanstack/react-query"
+import { useProjects } from "@/hooks"
+import { Search, AlertCircle, FolderKanban, RefreshCw } from "lucide-react"
+import { useState } from "react"
+import { toast } from "sonner"
 
 export default function Projects() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
-  const [projects, setProjects] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
 
-  // Fetch projects from API
-  const fetchProjects = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const response = await projectsService.getProjects({})
-      setProjects(response.data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load projects")
-      console.error("Error fetching projects:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Fetch projects using the useProjects hook
+  const {
+    data: response,
+    isLoading,
+    error,
+    refetch,
+  } = useProjects({})
 
-  useEffect(() => {
-    fetchProjects()
-  }, [])
-
-  const openProjects = projects.filter((p) => ["active", "planning", "on-hold"].includes(p.status))
-  const completedProjects = projects.filter((p) => p.status === "completed")
+  // response is a PaginatedResponse with { data: [], links: {...}, meta: {...} }
+  const projects = response?.data || []
+  const openProjects = projects.filter((p: any) => ["active", "planning", "on-hold"].includes(p.status))
+  const completedProjects = projects.filter((p: any) => p.status === "completed")
 
   const filterProjects = (projectsList: any[]) => {
     return projectsList.filter((project) => {
@@ -53,24 +45,52 @@ export default function Projects() {
     })
   }
 
+  const handleProjectCreated = () => {
+    queryClient.invalidateQueries({ queryKey: ["projects"] })
+    toast.success("Project created successfully", {
+      description: "Your new project has been added to the list.",
+    })
+  }
+
+  const handleRefresh = async () => {
+    toast.promise(refetch(), {
+      loading: "Refreshing projects...",
+      success: "Projects refreshed successfully",
+      error: "Failed to refresh projects",
+    })
+  }
+
   return (
-    <ProtectedRoute permissions={["project-view"]}>
-      <DashboardLayout breadcrumbs={[{ label: "Projects" }]}>
-        <div className="space-y-6 animate-in fade-in duration-500">
+    <DashboardLayout breadcrumbs={[{ label: "Projects" }]}>
+      <div className="space-y-6 animate-in fade-in duration-500">
           {/* Header */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
               <p className="text-muted-foreground">Manage your penetration testing projects</p>
             </div>
-            <NewProjectDialog onProjectCreated={fetchProjects} />
+            <div className="flex gap-2">
+              {!isLoading && (
+                <Button variant="outline" size="sm" onClick={handleRefresh}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Refresh
+                </Button>
+              )}
+              <NewProjectDialog onProjectCreated={handleProjectCreated} />
+            </div>
           </div>
 
           {/* Error Alert */}
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertTitle>Error loading projects</AlertTitle>
+              <AlertDescription className="flex items-center justify-between">
+                <span>{error instanceof Error ? error.message : "Failed to load projects"}</span>
+                <Button variant="outline" size="sm" onClick={handleRefresh}>
+                  Try Again
+                </Button>
+              </AlertDescription>
             </Alert>
           )}
 
@@ -83,10 +103,10 @@ export default function Projects() {
                 className="pl-9"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                disabled={loading}
+                disabled={isLoading}
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter} disabled={loading}>
+            <Select value={statusFilter} onValueChange={setStatusFilter} disabled={isLoading}>
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
@@ -101,7 +121,7 @@ export default function Projects() {
           </div>
 
           {/* Loading State */}
-          {loading ? (
+          {isLoading ? (
             <div className="space-y-6">
               <div className="flex gap-4 border-b">
                 <Skeleton className="h-10 w-32" />
@@ -119,6 +139,14 @@ export default function Projects() {
                 ))}
               </div>
             </div>
+          ) : projects.length === 0 ? (
+            /* Empty State - No projects at all */
+            <EmptyState
+              icon={FolderKanban}
+              title="No projects yet"
+              description="Get started by creating your first penetration testing project. You can add scopes, findings, and generate reports."
+              action={<NewProjectDialog onProjectCreated={handleProjectCreated} />}
+            />
           ) : (
             /* Tabs */
             <Tabs defaultValue="open" className="space-y-6">
@@ -134,36 +162,77 @@ export default function Projects() {
               </TabsList>
 
               <TabsContent value="open" className="space-y-6">
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {filterProjects(openProjects).map((project) => (
-                    <ProjectCard key={project.id} project={project} />
-                  ))}
-                </div>
-                {filterProjects(openProjects).length === 0 && (
-                  <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border p-12 text-center">
-                    <p className="text-lg font-medium">No projects found</p>
-                    <p className="text-sm text-muted-foreground">Try adjusting your filters or create a new project</p>
+                {filterProjects(openProjects).length === 0 ? (
+                  <EmptyState
+                    icon={Search}
+                    title={searchQuery || statusFilter !== "all" ? "No projects match your filters" : "No open projects"}
+                    description={
+                      searchQuery || statusFilter !== "all"
+                        ? "Try adjusting your search criteria or filters"
+                        : "Create a new project to get started"
+                    }
+                    action={
+                      searchQuery || statusFilter !== "all" ? (
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setSearchQuery("")
+                            setStatusFilter("all")
+                          }}
+                        >
+                          Clear Filters
+                        </Button>
+                      ) : (
+                        <NewProjectDialog onProjectCreated={handleProjectCreated} />
+                      )
+                    }
+                  />
+                ) : (
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {filterProjects(openProjects).map((project) => (
+                      <ProjectCard key={project.id} project={project} />
+                    ))}
                   </div>
                 )}
               </TabsContent>
 
               <TabsContent value="completed" className="space-y-6">
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {filterProjects(completedProjects).map((project) => (
-                    <ProjectCard key={project.id} project={project} />
-                  ))}
-                </div>
-                {filterProjects(completedProjects).length === 0 && (
-                  <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border p-12 text-center">
-                    <p className="text-lg font-medium">No completed projects</p>
-                    <p className="text-sm text-muted-foreground">Completed projects will appear here</p>
+                {filterProjects(completedProjects).length === 0 ? (
+                  <EmptyState
+                    icon={FolderKanban}
+                    title={
+                      searchQuery || statusFilter !== "all" ? "No projects match your filters" : "No completed projects"
+                    }
+                    description={
+                      searchQuery || statusFilter !== "all"
+                        ? "Try adjusting your search criteria"
+                        : "Completed projects will appear here once you mark them as complete"
+                    }
+                    action={
+                      searchQuery || statusFilter !== "all" ? (
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setSearchQuery("")
+                            setStatusFilter("all")
+                          }}
+                        >
+                          Clear Filters
+                        </Button>
+                      ) : null
+                    }
+                  />
+                ) : (
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {filterProjects(completedProjects).map((project) => (
+                      <ProjectCard key={project.id} project={project} />
+                    ))}
                   </div>
                 )}
               </TabsContent>
             </Tabs>
           )}
         </div>
-      </DashboardLayout>
-    </ProtectedRoute>
+    </DashboardLayout>
   )
 }
