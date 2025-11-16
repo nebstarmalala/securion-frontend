@@ -13,7 +13,7 @@ import { ScopeFormDialog } from "@/components/scope-form-dialog"
 import { FindingFormDialog } from "@/components/finding-form-dialog"
 import { ProtectedRoute } from "@/components/protected-route"
 import { projectsService, scopesService, findingsService } from "@/lib/api"
-import type { ApiProject, ApiScope, ApiFinding } from "@/lib/types/api"
+import type { ApiProject, ApiScope, ApiFinding, ScopeService } from "@/lib/types/api"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
 
@@ -86,6 +86,33 @@ const getRelativeTime = (dateString: string) => {
   return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`
 }
 
+const formatVulnerabilityType = (type: string) => {
+  const typeMap: Record<string, string> = {
+    "injection": "Injection",
+    "authentication": "Broken Authentication",
+    "xss": "Cross-Site Scripting",
+    "access-control": "Broken Access Control",
+    "security-misconfiguration": "Security Misconfiguration",
+    "cryptographic-failures": "Cryptographic Failures",
+    "ssrf": "Server-Side Request Forgery",
+    "deserialization": "Insecure Deserialization",
+    "vulnerable-components": "Vulnerable Components",
+    "other": "Other",
+  }
+  return typeMap[type] || type.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")
+}
+
+const formatStatus = (status: string) => {
+  const statusMap: Record<string, string> = {
+    "open": "Open",
+    "confirmed": "Confirmed",
+    "fixed": "Fixed",
+    "false-positive": "False Positive",
+    "accepted": "Accepted Risk",
+  }
+  return statusMap[status] || status.charAt(0).toUpperCase() + status.slice(1)
+}
+
 interface FindingCounts {
   critical: number
   high: number
@@ -111,6 +138,7 @@ export default function ScopeDetails() {
   const [error, setError] = useState<string | null>(null)
   const [editingFinding, setEditingFinding] = useState<ApiFinding | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editScopeDialogOpen, setEditScopeDialogOpen] = useState(false)
 
   useEffect(() => {
     if (id && scopeId) {
@@ -276,27 +304,14 @@ export default function ScopeDetails() {
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
+                <button className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 w-10">
                   <MoreVertical className="h-4 w-4" />
-                </Button>
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <ScopeFormDialog
-                  mode="edit"
-                  projectId={id}
-                  scopeId={scopeId}
-                  initialData={{
-                    name: scope.name,
-                    type: scope.type,
-                    target: scope.target,
-                    port: scope.port?.toString() || "",
-                    protocol: scope.protocol || "",
-                    notes: scope.notes || "",
-                    tags: scope.tags || [],
-                  }}
-                  onScopeUpdated={fetchScopeData}
-                  trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Edit Scope</DropdownMenuItem>}
-                />
+                <DropdownMenuItem onClick={() => setEditScopeDialogOpen(true)}>
+                  Edit Scope
+                </DropdownMenuItem>
                 <DropdownMenuItem className="text-destructive" onClick={handleDeleteScope}>
                   Delete Scope
                 </DropdownMenuItem>
@@ -364,9 +379,12 @@ export default function ScopeDetails() {
                     <div>
                       <h3 className="text-sm font-medium text-muted-foreground mb-3">Services</h3>
                       <div className="grid gap-3 sm:grid-cols-2">
-                        {scope.services.map((service: string, index: number) => (
+                        {scope.services.map((service, index: number) => (
                           <div key={index} className="rounded-lg border border-border bg-muted/50 p-3">
-                            <p className="font-medium text-sm">{service}</p>
+                            <p className="font-medium text-sm">{service.name}</p>
+                            {service.version && (
+                              <p className="text-xs text-muted-foreground mt-1">Version: {service.version}</p>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -479,7 +497,7 @@ export default function ScopeDetails() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="text-xs">
-                            {finding.vulnerability_type}
+                            {formatVulnerabilityType(finding.vulnerability_type)}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -491,7 +509,7 @@ export default function ScopeDetails() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={getFindingStatusColor(finding.status)}>
-                            {finding.status}
+                            {formatStatus(finding.status)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
@@ -500,9 +518,9 @@ export default function ScopeDetails() {
                         <TableCell>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <button className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-8 w-8">
                                 <MoreVertical className="h-4 w-4" />
-                              </Button>
+                              </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => handleEditFinding(finding)}>
@@ -550,6 +568,27 @@ export default function ScopeDetails() {
               onOpenChange={setEditDialogOpen}
             />
           )}
+
+          {/* Edit Scope Dialog */}
+          <ScopeFormDialog
+            mode="edit"
+            projectId={id}
+            scopeId={scopeId}
+            initialData={{
+              name: scope.name,
+              type: scope.type,
+              target: scope.target,
+              port: scope.port?.toString() || "",
+              protocol: scope.protocol || "",
+              notes: scope.notes || "",
+              tags: scope.tags || [],
+              services: scope.services || [],
+              status: scope.status,
+            }}
+            onScopeUpdated={fetchScopeData}
+            open={editScopeDialogOpen}
+            onOpenChange={setEditScopeDialogOpen}
+          />
         </div>
       </DashboardLayout>
     </ProtectedRoute>
