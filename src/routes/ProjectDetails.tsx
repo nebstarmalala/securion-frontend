@@ -5,15 +5,23 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { ArrowLeft, MoreVertical, Calendar, Target, AlertTriangle, AlertCircle } from "lucide-react"
+import { ArrowLeft, MoreVertical, Calendar, Target, AlertTriangle, AlertCircle, Activity, Users, LayoutGrid } from "lucide-react"
 import { Link, useParams, useNavigate } from "react-router-dom"
 import { ScopeFormDialog } from "@/components/scope-form-dialog"
-import { ProtectedRoute } from "@/components/protected-route"
+import { NewProjectDialog } from "@/components/new-project-dialog"
+import { ProjectTeam } from "@/components/projects/ProjectTeam"
+import { ProjectStats } from "@/components/projects/ProjectStats"
+import { ProjectTimeline } from "@/components/projects/ProjectTimeline"
+import { ProjectActivityFeed } from "@/components/projects/ProjectActivityFeed"
+import { ScopeKanban } from "@/components/projects/ScopeKanban"
+import { BulkScopeImport } from "@/components/projects/BulkScopeImport"
 import { projectsService, scopesService, findingsService } from "@/lib/api"
 import type { ApiProject, ApiScope, ApiFinding } from "@/lib/types/api"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
+import { useAuth } from "@/lib/contexts/auth-context"
 
 // Helper functions for styling
 const getStatusColor = (status: string) => {
@@ -82,6 +90,7 @@ interface FindingCounts {
 export default function ProjectDetails() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { canAccessProject } = useAuth()
   const [project, setProject] = useState<ApiProject | null>(null)
   const [scopes, setScopes] = useState<ApiScope[]>([])
   const [findings, setFindings] = useState<ApiFinding[]>([])
@@ -94,6 +103,8 @@ export default function ProjectDetails() {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [unauthorized, setUnauthorized] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -104,9 +115,17 @@ export default function ProjectDetails() {
   const fetchProjectData = async () => {
     if (!id) return
 
+    // Check if user has permission to view project details
+    if (!canAccessProject(id)) {
+      setUnauthorized(true)
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
+      setUnauthorized(false)
 
       // Fetch project details
       const projectData = await projectsService.getProject(id)
@@ -114,9 +133,7 @@ export default function ProjectDetails() {
 
       // Fetch scopes for this project
       const scopesData = await scopesService.getProjectScopes(id)
-      console.log("Scopes data received:", scopesData)
       const validScopes = Array.isArray(scopesData) ? scopesData : []
-      console.log("Valid scopes:", validScopes)
       setScopes(validScopes)
 
       // Fetch all findings for all scopes in this project
@@ -141,7 +158,6 @@ export default function ProjectDetails() {
         })
         setFindingCounts(counts)
       } else {
-        // No scopes, so no findings
         setFindings([])
         setFindingCounts({
           critical: 0,
@@ -162,6 +178,10 @@ export default function ProjectDetails() {
     }
   }
 
+  const handleEditProject = () => {
+    setEditDialogOpen(true)
+  }
+
   const handleDeleteProject = async () => {
     if (!id || !confirm("Are you sure you want to delete this project? This action cannot be undone.")) return
 
@@ -179,41 +199,46 @@ export default function ProjectDetails() {
 
   if (loading) {
     return (
-      <ProtectedRoute permissions={["project-view"]}>
-        <DashboardLayout breadcrumbs={[{ label: "Projects", href: "/projects" }, { label: "Loading..." }]}>
-          <div className="space-y-6">
-            <Skeleton className="h-12 w-2/3" />
-            <div className="grid gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2 space-y-6">
-                <Skeleton className="h-64 w-full" />
-              </div>
-              <div className="space-y-6">
-                <Skeleton className="h-48 w-full" />
-                <Skeleton className="h-48 w-full" />
-              </div>
-            </div>
-          </div>
-        </DashboardLayout>
-      </ProtectedRoute>
+      <DashboardLayout breadcrumbs={[{ label: "Projects", href: "/projects" }, { label: "Loading..." }]}>
+        <div className="space-y-6">
+          <Skeleton className="h-12 w-2/3" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (unauthorized) {
+    return (
+      <DashboardLayout breadcrumbs={[{ label: "Projects", href: "/projects" }, { label: "Unauthorized" }]}>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>You do not have permission to view this project's details</AlertDescription>
+        </Alert>
+        <Link to="/projects">
+          <Button variant="outline" className="mt-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Projects
+          </Button>
+        </Link>
+      </DashboardLayout>
     )
   }
 
   if (error || !project) {
     return (
-      <ProtectedRoute permissions={["project-view"]}>
-        <DashboardLayout breadcrumbs={[{ label: "Projects", href: "/projects" }, { label: "Error" }]}>
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error || "Project not found"}</AlertDescription>
-          </Alert>
-          <Link to="/projects">
-            <Button variant="outline" className="mt-4">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Projects
-            </Button>
-          </Link>
-        </DashboardLayout>
-      </ProtectedRoute>
+      <DashboardLayout breadcrumbs={[{ label: "Projects", href: "/projects" }, { label: "Error" }]}>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error || "Project not found"}</AlertDescription>
+        </Alert>
+        <Link to="/projects">
+          <Button variant="outline" className="mt-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Projects
+          </Button>
+        </Link>
+      </DashboardLayout>
     )
   }
 
@@ -222,275 +247,232 @@ export default function ProjectDetails() {
   const client = project.client || "Not specified"
 
   return (
-    <ProtectedRoute permissions={["project-view"]}>
-      <DashboardLayout breadcrumbs={[{ label: "Projects", href: "/projects" }, { label: project.name }]}>
-        <div className="space-y-6 animate-in fade-in duration-500">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <Link to="/projects">
-                <Button variant="ghost" size="sm" className="gap-2 -ml-2 mb-2">
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Projects
+    <DashboardLayout breadcrumbs={[{ label: "Projects", href: "/projects" }, { label: project.name }]}>
+      <div className="space-y-6 animate-in fade-in duration-500">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <Link to="/projects">
+              <Button variant="ghost" size="sm" className="gap-2 -ml-2 mb-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back to Projects
+              </Button>
+            </Link>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
+              <Badge variant="outline" className={getStatusColor(project.status)}>
+                {project.status}
+              </Badge>
+            </div>
+            <p className="text-muted-foreground">{client}</p>
+          </div>
+          <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <MoreVertical className="h-4 w-4" />
                 </Button>
-              </Link>
-              <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
-                <Badge variant="outline" className={getStatusColor(project.status)}>
-                  {project.status}
-                </Badge>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleEditProject}>Edit Project</DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive" onClick={handleDeleteProject}>
+                  Delete Project
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {/* Edit Project Dialog */}
+        <NewProjectDialog
+          mode="edit"
+          project={project}
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          onProjectUpdated={fetchProjectData}
+        />
+
+        {/* Statistics Cards */}
+        <ProjectStats project={project} scopes={scopes} findings={findings} />
+
+        {/* Tabbed Interface */}
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="overview" className="gap-2">
+              <Target className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="scopes" className="gap-2">
+              <LayoutGrid className="h-4 w-4" />
+              Scopes
+            </TabsTrigger>
+            <TabsTrigger value="team" className="gap-2">
+              <Users className="h-4 w-4" />
+              Team
+            </TabsTrigger>
+            <TabsTrigger value="activity" className="gap-2">
+              <Activity className="h-4 w-4" />
+              Activity
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            <div className="grid gap-6 lg:grid-cols-3">
+              {/* Project Information */}
+              <div className="lg:col-span-2 space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Project Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-sm font-medium text-muted-foreground mb-2">Description</h3>
+                        <p className="text-sm">{project.description}</p>
+                      </div>
+
+                      <Separator />
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <h3 className="text-sm font-medium text-muted-foreground mb-2">Test Type</h3>
+                          <Badge variant="secondary">{testType}</Badge>
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-medium text-muted-foreground mb-2">Timeline</h3>
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <span>
+                              {formatDate(project.start_date)} - {formatDate(project.end_date)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {project.tags && project.tags.length > 0 && (
+                        <div>
+                          <h3 className="text-sm font-medium text-muted-foreground mb-2">Tags</h3>
+                          <div className="flex flex-wrap gap-2">
+                            {project.tags.map((tag) => (
+                              <Badge key={tag} variant="secondary">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <ProjectTimeline project={project} />
               </div>
-              <p className="text-muted-foreground">{client}</p>
-            </div>
-            <div className="flex gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Edit Project</DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive" onClick={handleDeleteProject}>
-                    Delete Project
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
 
-          {/* Project Info Grid */}
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Left Column - Main Info */}
-            <div className="space-y-6 lg:col-span-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Project Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground mb-2">Description</h3>
-                      <p className="text-sm">{project.description}</p>
-                    </div>
-
-                    <Separator />
-
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <h3 className="text-sm font-medium text-muted-foreground mb-2">Test Type</h3>
-                        <Badge variant="secondary">{testType}</Badge>
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-medium text-muted-foreground mb-2">Timeline</h3>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span>
-                            {formatDate(project.start_date)} - {formatDate(project.end_date)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {project.tags && project.tags.length > 0 && (
-                      <div>
-                        <h3 className="text-sm font-medium text-muted-foreground mb-2">Tags</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {project.tags.map((tag) => (
-                            <Badge key={tag} variant="secondary">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Right Column - Stats & Team */}
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Key Metrics</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Target className="h-4 w-4" />
-                      <span>Total Scopes</span>
-                    </div>
-                    <span className="text-2xl font-bold">{scopes.length}</span>
-                  </div>
-                  <Separator />
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
+              {/* Sidebar */}
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Key Metrics</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <AlertTriangle className="h-4 w-4" />
-                        <span>Total Findings</span>
+                        <Target className="h-4 w-4" />
+                        <span>Total Scopes</span>
                       </div>
-                      <span className="text-2xl font-bold">{totalFindings}</span>
+                      <span className="text-2xl font-bold">{scopes.length}</span>
                     </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <Badge variant="outline" className={getSeverityColor("critical")}>
-                          Critical
-                        </Badge>
-                        <span className="font-medium">{findingCounts.critical}</span>
+                    <Separator />
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <AlertTriangle className="h-4 w-4" />
+                          <span>Total Findings</span>
+                        </div>
+                        <span className="text-2xl font-bold">{totalFindings}</span>
                       </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <Badge variant="outline" className={getSeverityColor("high")}>
-                          High
-                        </Badge>
-                        <span className="font-medium">{findingCounts.high}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <Badge variant="outline" className={getSeverityColor("medium")}>
-                          Medium
-                        </Badge>
-                        <span className="font-medium">{findingCounts.medium}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <Badge variant="outline" className={getSeverityColor("low")}>
-                          Low
-                        </Badge>
-                        <span className="font-medium">{findingCounts.low}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <Badge variant="outline" className={getSeverityColor("info")}>
-                          Info
-                        </Badge>
-                        <span className="font-medium">{findingCounts.info}</span>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <Badge variant="outline" className={getSeverityColor("critical")}>
+                            Critical
+                          </Badge>
+                          <span className="font-medium">{findingCounts.critical}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <Badge variant="outline" className={getSeverityColor("high")}>
+                            High
+                          </Badge>
+                          <span className="font-medium">{findingCounts.high}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <Badge variant="outline" className={getSeverityColor("medium")}>
+                            Medium
+                          </Badge>
+                          <span className="font-medium">{findingCounts.medium}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Project Info</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Created</p>
-                    <p className="text-sm font-medium">{formatDate(project.created_at)}</p>
-                  </div>
-                  <Separator />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Last Updated</p>
-                    <p className="text-sm font-medium">{project.last_updated}</p>
-                  </div>
-                  <Separator />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Status</p>
-                    <Badge variant="outline" className={getStatusColor(project.status)}>
-                      {project.status}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Project Info</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Created</p>
+                      <p className="text-sm font-medium">{formatDate(project.created_at)}</p>
+                    </div>
+                    <Separator />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Last Updated</p>
+                      <p className="text-sm font-medium">{project.last_updated}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
-          </div>
+          </TabsContent>
 
-          {/* Scopes Section */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Scopes</CardTitle>
-                  <CardDescription>Testing targets and endpoints for this project</CardDescription>
-                </div>
+          {/* Scopes Tab */}
+          <TabsContent value="scopes" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">Scopes</h2>
+                <p className="text-muted-foreground">Manage testing targets and endpoints</p>
+              </div>
+              <div className="flex gap-2">
+                <BulkScopeImport projectId={id!} onScopesImported={fetchProjectData} />
                 <ScopeFormDialog mode="add" projectId={id} onScopeCreated={fetchProjectData} />
               </div>
-            </CardHeader>
-            <CardContent>
-              {scopes.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border p-12 text-center">
-                  <Target className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-lg font-medium">No scopes yet</p>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Add testing targets and endpoints to this project
-                  </p>
-                  <ScopeFormDialog mode="add" projectId={id} onScopeCreated={fetchProjectData} />
-                </div>
-              ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {scopes.map((scope) => {
-                    // Calculate findings for this scope
-                    const scopeFindings = findings.filter((f) => f.scope_id === scope.id)
-                    const scopeFindingCounts = {
-                      critical: scopeFindings.filter((f) => f.severity === "critical").length,
-                      high: scopeFindings.filter((f) => f.severity === "high").length,
-                      medium: scopeFindings.filter((f) => f.severity === "medium").length,
-                      low: scopeFindings.filter((f) => f.severity === "low").length,
-                      info: scopeFindings.filter((f) => f.severity === "info").length,
-                    }
-                    const scopeTotalFindings = scopeFindings.length
+            </div>
 
-                    return (
-                      <Link key={scope.id} to={`/projects/${project.id}/scopes/${scope.id}`}>
-                        <Card className="group transition-all hover:shadow-md hover:border-primary/50">
-                          <CardHeader>
-                            <div className="flex items-start justify-between gap-2">
-                              <CardTitle className="text-base group-hover:text-primary transition-colors">
-                                {scope.name}
-                              </CardTitle>
-                              <Badge variant="outline" className="text-xs">
-                                {scope.type}
-                              </Badge>
-                            </div>
-                            <code className="text-xs text-muted-foreground font-mono break-all">{scope.target}</code>
-                          </CardHeader>
-                          <CardContent className="space-y-3">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">Status</span>
-                              <Badge variant="secondary" className="text-xs">
-                                {scope.status}
-                              </Badge>
-                            </div>
-                            {scope.port && (
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">Port</span>
-                                <span className="font-medium">{scope.port}</span>
-                              </div>
-                            )}
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">Findings</span>
-                              <span className="font-medium">{scopeTotalFindings}</span>
-                            </div>
-                            {scopeTotalFindings > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {scopeFindingCounts.critical > 0 && (
-                                  <Badge variant="outline" className={getSeverityColor("critical")}>
-                                    {scopeFindingCounts.critical} C
-                                  </Badge>
-                                )}
-                                {scopeFindingCounts.high > 0 && (
-                                  <Badge variant="outline" className={getSeverityColor("high")}>
-                                    {scopeFindingCounts.high} H
-                                  </Badge>
-                                )}
-                                {scopeFindingCounts.medium > 0 && (
-                                  <Badge variant="outline" className={getSeverityColor("medium")}>
-                                    {scopeFindingCounts.medium} M
-                                  </Badge>
-                                )}
-                              </div>
-                            )}
-                            <p className="text-xs text-muted-foreground">Updated {getRelativeTime(scope.updated_at)}</p>
-                          </CardContent>
-                        </Card>
-                      </Link>
-                    )
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </DashboardLayout>
-    </ProtectedRoute>
+            <ScopeKanban scopes={scopes} projectId={id!} />
+          </TabsContent>
+
+          {/* Team Tab */}
+          <TabsContent value="team" className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Team Management</h2>
+              <p className="text-muted-foreground">Manage project team members and roles</p>
+            </div>
+
+            <ProjectTeam project={project} onProjectUpdated={fetchProjectData} />
+          </TabsContent>
+
+          {/* Activity Tab */}
+          <TabsContent value="activity" className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Activity Feed</h2>
+              <p className="text-muted-foreground">Track all project activity and changes</p>
+            </div>
+
+            <ProjectActivityFeed projectId={id!} />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </DashboardLayout>
   )
 }
