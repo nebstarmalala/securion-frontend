@@ -112,6 +112,17 @@ class AuthService {
     if (!user) return false
     return permissions.every((permission) => this.hasPermission(user, permission))
   }
+
+  /**
+   * Check if user can access a specific project
+   * Users with project-view permission can access project details
+   * This can be extended to check project-specific permissions from the backend
+   */
+  canAccessProject(user: ApiUser | null, projectId?: string): boolean {
+    if (!user) return false
+    // Check if user has the project-view permission
+    return this.hasPermission(user, "project-view")
+  }
 }
 
 // Export singleton instance
