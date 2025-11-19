@@ -18,13 +18,9 @@ class FindingsService {
    * Get all findings with optional filtering
    */
   async getFindings(params?: ListQueryParams): Promise<PaginatedResponse<ApiFinding>> {
-    const response = await apiClient.get<ApiResponse<PaginatedResponse<ApiFinding>>>("/findings", params)
-
-    if (response.success && response.data) {
-      return response.data
-    }
-
-    throw new Error(response.message || "Failed to fetch findings")
+    // API client already throws errors for failed requests
+    // Paginated responses return { data: [], links: {...}, meta: {...} } directly
+    return await apiClient.get<PaginatedResponse<ApiFinding>>("/findings", params)
   }
 
   /**
@@ -32,12 +28,7 @@ class FindingsService {
    */
   async getFinding(findingId: string): Promise<ApiFinding> {
     const response = await apiClient.get<ApiResponse<ApiFinding>>(`/findings/${findingId}`)
-
-    if (response.success && response.data) {
-      return response.data
-    }
-
-    throw new Error(response.message || "Failed to fetch finding")
+    return response.data
   }
 
   /**
@@ -45,12 +36,7 @@ class FindingsService {
    */
   async createFinding(data: CreateFindingInput): Promise<ApiFinding> {
     const response = await apiClient.post<ApiResponse<ApiFinding>>("/findings", data)
-
-    if (response.success && response.data) {
-      return response.data
-    }
-
-    throw new Error(response.message || "Failed to create finding")
+    return response.data
   }
 
   /**
@@ -58,12 +44,7 @@ class FindingsService {
    */
   async updateFinding(findingId: string, data: UpdateFindingInput): Promise<ApiFinding> {
     const response = await apiClient.put<ApiResponse<ApiFinding>>(`/findings/${findingId}`, data)
-
-    if (response.success && response.data) {
-      return response.data
-    }
-
-    throw new Error(response.message || "Failed to update finding")
+    return response.data
   }
 
   /**
@@ -71,12 +52,7 @@ class FindingsService {
    */
   async updateFindingStatus(findingId: string, data: UpdateFindingStatusInput): Promise<ApiFinding> {
     const response = await apiClient.put<ApiResponse<ApiFinding>>(`/findings/${findingId}/status`, data)
-
-    if (response.success && response.data) {
-      return response.data
-    }
-
-    throw new Error(response.message || "Failed to update finding status")
+    return response.data
   }
 
   /**
@@ -84,40 +60,27 @@ class FindingsService {
    */
   async bulkUpdateFindingStatus(data: BulkUpdateFindingStatusInput): Promise<{ count: number }> {
     const response = await apiClient.put<ApiResponse<{ count: number }>>("/findings/bulk/status", data)
-
-    if (response.success && response.data) {
-      return response.data
-    }
-
-    throw new Error(response.message || "Failed to bulk update findings")
+    return response.data
   }
 
   /**
    * Delete finding
    */
   async deleteFinding(findingId: string): Promise<void> {
-    const response = await apiClient.delete<ApiResponse>(`/findings/${findingId}`)
-
-    if (!response.success) {
-      throw new Error(response.message || "Failed to delete finding")
-    }
+    await apiClient.delete<ApiResponse>(`/findings/${findingId}`)
+    // API client throws error if request fails, so if we reach here, it succeeded
   }
 
   /**
    * Get findings for a specific scope
    */
   async getScopeFindings(scopeId: string): Promise<ApiFinding[]> {
-    const response = await apiClient.get<ApiResponse<ApiFinding[]>>("/findings", {
+    const response = await apiClient.get<PaginatedResponse<ApiFinding>>("/findings", {
       search: scopeId,
       searchColumn: "scope_id",
       perPage: "all",
     })
-
-    if (response.success && response.data) {
-      return response.data
-    }
-
-    throw new Error(response.message || "Failed to fetch scope findings")
+    return response.data
   }
 
   /**
@@ -151,6 +114,23 @@ class FindingsService {
     const allFindings = await this.getFindings({ perPage: "all" })
     return allFindings.data.filter((f) => f.severity === "critical" || f.severity === "high")
   }
+
+  /**
+   * Get finding activities
+   */
+  async getFindingActivities(findingId: string, params?: ListQueryParams): Promise<PaginatedResponse<any>> {
+    return await apiClient.get<PaginatedResponse<any>>(`/findings/${findingId}/activities`, params)
+  }
+
+  // Convenience aliases for hook compatibility
+  list = this.getFindings.bind(this)
+  get = this.getFinding.bind(this)
+  create = this.createFinding.bind(this)
+  update = this.updateFinding.bind(this)
+  updateStatus = this.updateFindingStatus.bind(this)
+  bulkUpdateStatus = this.bulkUpdateFindingStatus.bind(this)
+  delete = this.deleteFinding.bind(this)
+  getActivities = this.getFindingActivities.bind(this)
 }
 
 // Export singleton instance
