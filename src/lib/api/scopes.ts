@@ -17,13 +17,9 @@ class ScopesService {
    * Get all scopes with optional filtering
    */
   async getScopes(params?: ListQueryParams): Promise<PaginatedResponse<ApiScope>> {
-    const response = await apiClient.get<ApiResponse<PaginatedResponse<ApiScope>>>("/scopes", params)
-
-    if (response.success && response.data) {
-      return response.data
-    }
-
-    throw new Error(response.message || "Failed to fetch scopes")
+    // API client already throws errors for failed requests
+    // Paginated responses return { data: [], links: {...}, meta: {...} } directly
+    return await apiClient.get<PaginatedResponse<ApiScope>>("/scopes", params)
   }
 
   /**
@@ -31,12 +27,7 @@ class ScopesService {
    */
   async getScope(scopeId: string): Promise<ApiScope> {
     const response = await apiClient.get<ApiResponse<ApiScope>>(`/scopes/${scopeId}`)
-
-    if (response.success && response.data) {
-      return response.data
-    }
-
-    throw new Error(response.message || "Failed to fetch scope")
+    return response.data
   }
 
   /**
@@ -44,12 +35,7 @@ class ScopesService {
    */
   async createScope(data: CreateScopeInput): Promise<ApiScope> {
     const response = await apiClient.post<ApiResponse<ApiScope>>("/scopes", data)
-
-    if (response.success && response.data) {
-      return response.data
-    }
-
-    throw new Error(response.message || "Failed to create scope")
+    return response.data
   }
 
   /**
@@ -57,12 +43,7 @@ class ScopesService {
    */
   async bulkCreateScopes(data: BulkCreateScopesInput): Promise<ApiScope[]> {
     const response = await apiClient.post<ApiResponse<ApiScope[]>>("/scopes/bulk", data)
-
-    if (response.success && response.data) {
-      return response.data
-    }
-
-    throw new Error(response.message || "Failed to create scopes")
+    return response.data
   }
 
   /**
@@ -70,23 +51,15 @@ class ScopesService {
    */
   async updateScope(scopeId: string, data: UpdateScopeInput): Promise<ApiScope> {
     const response = await apiClient.put<ApiResponse<ApiScope>>(`/scopes/${scopeId}`, data)
-
-    if (response.success && response.data) {
-      return response.data
-    }
-
-    throw new Error(response.message || "Failed to update scope")
+    return response.data
   }
 
   /**
    * Delete scope
    */
   async deleteScope(scopeId: string): Promise<void> {
-    const response = await apiClient.delete<ApiResponse>(`/scopes/${scopeId}`)
-
-    if (!response.success) {
-      throw new Error(response.message || "Failed to delete scope")
-    }
+    await apiClient.delete<ApiResponse>(`/scopes/${scopeId}`)
+    // API client throws error if request fails, so if we reach here, it succeeded
   }
 
   /**
@@ -119,6 +92,22 @@ class ScopesService {
 
     return scopes
   }
+
+  /**
+   * Get scope activities
+   */
+  async getScopeActivities(scopeId: string, params?: ListQueryParams): Promise<PaginatedResponse<any>> {
+    return await apiClient.get<PaginatedResponse<any>>(`/scopes/${scopeId}/activities`, params)
+  }
+
+  // Convenience aliases for hook compatibility
+  list = this.getScopes.bind(this)
+  get = this.getScope.bind(this)
+  create = this.createScope.bind(this)
+  bulkCreate = this.bulkCreateScopes.bind(this)
+  update = this.updateScope.bind(this)
+  delete = this.deleteScope.bind(this)
+  getActivities = this.getScopeActivities.bind(this)
 }
 
 // Export singleton instance
