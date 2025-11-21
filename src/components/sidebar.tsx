@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
-import { Home, FolderKanban, Shield, Settings, LogOut, ChevronLeft, Menu, FileText, Users } from "lucide-react"
+import { Home, FolderKanban, Shield, Settings, LogOut, ChevronLeft, Menu, FileText, Users, Workflow, Webhook, Plug, Database, Activity, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -27,10 +27,44 @@ const navigation = [
     icon: Shield,
   },
   {
+    name: "Workflows",
+    href: "/workflows",
+    icon: Workflow,
+  },
+  {
+    name: "Webhooks",
+    href: "/webhooks",
+    icon: Webhook,
+  },
+  {
+    name: "Integrations",
+    href: "/integrations",
+    icon: Plug,
+  },
+  {
     name: "Users",
     href: "/users",
     icon: Users,
     permission: "user-view",
+  },
+]
+
+const systemNavigation = [
+  {
+    name: "Cache Management",
+    href: "/system/cache",
+    icon: Database,
+    permission: "super-admin",
+  },
+  {
+    name: "Queue Monitoring",
+    href: "/system/queue",
+    icon: Activity,
+  },
+  {
+    name: "Error Logs",
+    href: "/system/error-logs",
+    icon: AlertTriangle,
   },
 ]
 
@@ -77,7 +111,7 @@ export function Sidebar() {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 space-y-1 p-4">
+          <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
             {navigation.map((item) => {
               // Check if user has permission to view this item
               if (item.permission && !hasPermission(item.permission)) {
@@ -101,6 +135,38 @@ export function Sidebar() {
                 </Link>
               )
             })}
+
+            {/* System Management Section */}
+            <div className="pt-4 mt-4 border-t border-sidebar-border">
+              {!collapsed && (
+                <div className="px-3 pb-2 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">
+                  System
+                </div>
+              )}
+              {systemNavigation.map((item) => {
+                // Check if user has permission to view this item
+                if (item.permission && !hasPermission(item.permission)) {
+                  return null
+                }
+
+                const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className={cn(
+                      "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
+                      isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground before:absolute before:left-0 before:h-full before:w-1 before:rounded-r-full before:bg-primary"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                    )}
+                  >
+                    <item.icon className="h-5 w-5 shrink-0" />
+                    {!collapsed && <span className="flex-1">{item.name}</span>}
+                  </Link>
+                )
+              })}
+            </div>
           </nav>
 
           {/* Settings - pinned to bottom */}
