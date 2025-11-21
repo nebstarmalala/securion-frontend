@@ -196,7 +196,7 @@ export function AdvancedFilters({
 
       toast.success("Filter preset saved")
     } catch (error) {
-      console.error("Failed to save filter preset:", error)
+      toast.error("Failed to save filter preset")
     }
   }
 
