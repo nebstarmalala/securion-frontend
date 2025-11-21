@@ -168,9 +168,10 @@ function SavedSearchFormDialog({
       setIsPublic(false)
       setQueryParams("{}")
     } catch (error) {
-      console.error("Failed to save search:", error)
       if (error instanceof SyntaxError) {
         toast.error("Invalid JSON in query parameters")
+      } else {
+        toast.error("Failed to save search")
       }
     }
   }
@@ -453,7 +454,7 @@ export function SavedSearches() {
       // This is a simplified version - you may want to handle this differently
       toast.success(`Found ${results.meta.total} results`)
     } catch (error) {
-      console.error("Failed to execute search:", error)
+      toast.error("Failed to execute search")
     }
   }
 
@@ -465,7 +466,7 @@ export function SavedSearches() {
     try {
       await deleteMutation.mutateAsync(search.id)
     } catch (error) {
-      console.error("Failed to delete search:", error)
+      toast.error("Failed to delete search")
     }
   }
 
