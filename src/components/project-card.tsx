@@ -4,39 +4,10 @@ import { Badge } from "@/components/ui/badge"
 import { Calendar } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ApiProject } from "@/lib/types/api"
+import { getProjectStatusColor, getShortRelativeTime } from "@/lib/style-utils"
 
 interface ProjectCardProps {
   project: ApiProject
-}
-
-// Helper functions for styling
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "active":
-      return "border-green-500 text-green-700 dark:text-green-400"
-    case "planning":
-      return "border-blue-500 text-blue-700 dark:text-blue-400"
-    case "on-hold":
-      return "border-yellow-500 text-yellow-700 dark:text-yellow-400"
-    case "completed":
-      return "border-gray-500 text-gray-700 dark:text-gray-400"
-    case "cancelled":
-      return "border-red-500 text-red-700 dark:text-red-400"
-    default:
-      return ""
-  }
-}
-
-const getRelativeTime = (dateString: string) => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 30) return `${diffDays}d ago`
-  return date.toLocaleDateString()
 }
 
 export function ProjectCard({ project }: ProjectCardProps) {
@@ -52,7 +23,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
               <CardTitle className="text-lg group-hover:text-primary transition-colors">{project.name}</CardTitle>
               <CardDescription className="line-clamp-1">{client}</CardDescription>
             </div>
-            <Badge variant="outline" className={getStatusColor(project.status)}>
+            <Badge variant="outline" className={getProjectStatusColor(project.status)}>
               {project.status}
             </Badge>
           </div>
@@ -77,7 +48,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             <Badge variant="secondary" className="text-xs">
               {testType}
             </Badge>
-            <span className="text-xs text-muted-foreground">{getRelativeTime(project.updated_at)}</span>
+            <span className="text-xs text-muted-foreground">{getShortRelativeTime(project.updated_at)}</span>
           </div>
 
           {/* Tags */}
