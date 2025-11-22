@@ -238,8 +238,6 @@ export function NewProjectDialog({
         onProjectCreated?.()
       }
     } catch (error: any) {
-      console.error(`Failed to ${mode} project:`, error)
-
       // Handle validation errors from API
       if (error.status === 422 && error.errors) {
         const apiErrors: Record<string, string> = {}
