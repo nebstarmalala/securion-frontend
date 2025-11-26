@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/dashboard-layout"
-import { ProtectedRoute } from "@/components/protected-route"
+import { ProtectedRoute } from "@/components/ProtectedRoute"
 import { StatCard } from "@/components/stat-card"
 import { FindingsChart } from "@/components/findings-chart"
 import { AffectedServicesTable } from "@/components/affected-services-table"
@@ -7,6 +7,14 @@ import { ActivityTimeline } from "@/components/activity-timeline"
 import { TeamLeaderboard } from "@/components/team-leaderboard"
 import { KeyMetrics } from "@/components/key-metrics"
 import { CveCriticalAlerts } from "@/components/cve-critical-alerts"
+import {
+  QuickActions,
+  RecentlyViewed,
+  OnboardingChecklist,
+  TesterDashboard,
+  ManagerDashboard,
+  AdminDashboard,
+} from "@/components/dashboard"
 import {
   FolderKanban,
   AlertTriangle,
@@ -23,6 +31,7 @@ import {
   TrendingDown
 } from "lucide-react"
 import { useDashboardOverview } from "@/hooks"
+import { useAuth } from "@/lib/contexts/auth-context"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -30,27 +39,55 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useState } from "react"
+
+type DashboardView = "default" | "tester" | "manager" | "admin"
 
 export default function Dashboard() {
   const { data: overview, isLoading: loading, error, refetch } = useDashboardOverview()
+  const { user, hasRole } = useAuth()
+  const [dashboardView, setDashboardView] = useState<DashboardView>("default")
+
+  // Determine default view based on user role
+  const getDefaultView = (): DashboardView => {
+    if (hasRole("admin") || hasRole("super-admin")) return "admin"
+    if (hasRole("manager")) return "manager"
+    return "tester"
+  }
 
   return (
     <ProtectedRoute>
       <DashboardLayout breadcrumbs={[{ label: "Dashboard" }]}>
         <div className="space-y-6 animate-in fade-in duration-500">
-          {/* Header */}
+          {/* Header with View Switcher */}
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-              <p className="text-muted-foreground">Welcome back to Securion</p>
+              <p className="text-muted-foreground">Welcome back, {user?.username || "User"}!</p>
             </div>
-            {!loading && (
-              <Button variant="outline" size="sm" onClick={() => refetch()}>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Refresh
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {/* View Switcher */}
+              <Tabs value={dashboardView} onValueChange={(v) => setDashboardView(v as DashboardView)}>
+                <TabsList>
+                  <TabsTrigger value="default">Overview</TabsTrigger>
+                  <TabsTrigger value="tester">Tester</TabsTrigger>
+                  <TabsTrigger value="manager">Manager</TabsTrigger>
+                  {(hasRole("admin") || hasRole("super-admin")) && (
+                    <TabsTrigger value="admin">Admin</TabsTrigger>
+                  )}
+                </TabsList>
+              </Tabs>
+              {!loading && (
+                <Button variant="outline" size="sm" onClick={() => refetch()}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Refresh
+                </Button>
+              )}
+            </div>
           </div>
+
+          {/* Onboarding Checklist - Only for new users */}
+          <OnboardingChecklist />
 
           {/* Error State */}
           {error && (
@@ -66,7 +103,18 @@ export default function Dashboard() {
             </Alert>
           )}
 
-          {/* Stats Cards */}
+          {/* Role-Based Dashboard Views */}
+          {dashboardView === "tester" && <TesterDashboard />}
+          {dashboardView === "manager" && <ManagerDashboard />}
+          {dashboardView === "admin" && <AdminDashboard />}
+
+          {/* Default Overview Dashboard */}
+          {dashboardView === "default" && (
+            <>
+              {/* Quick Actions Panel */}
+              <QuickActions />
+
+              {/* Stats Cards */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {loading ? (
               <>
@@ -468,8 +516,13 @@ export default function Dashboard() {
               {/* Activity Timeline */}
               {!loading && overview && <ActivityTimeline />}
               {loading && <Skeleton className="h-96" />}
+
+              {/* Recently Viewed */}
+              <RecentlyViewed />
             </div>
           </div>
+            </>
+          )}
         </div>
       </DashboardLayout>
     </ProtectedRoute>
