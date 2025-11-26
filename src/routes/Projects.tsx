@@ -1,6 +1,6 @@
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { ProjectCard } from "@/components/project-card"
-import { NewProjectDialog } from "@/components/new-project-dialog"
+import { ProjectWizard } from "@/components/forms/ProjectWizard"
 import { EmptyState } from "@/components/empty-state"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -76,7 +76,7 @@ export default function Projects() {
                   Refresh
                 </Button>
               )}
-              <NewProjectDialog onProjectCreated={handleProjectCreated} />
+              <ProjectWizard onProjectCreated={handleProjectCreated} />
             </div>
           </div>
 
@@ -145,7 +145,7 @@ export default function Projects() {
               icon={FolderKanban}
               title="No projects yet"
               description="Get started by creating your first penetration testing project. You can add scopes, findings, and generate reports."
-              action={<NewProjectDialog onProjectCreated={handleProjectCreated} />}
+              action={<ProjectWizard onProjectCreated={handleProjectCreated} />}
             />
           ) : (
             /* Tabs */
@@ -183,7 +183,7 @@ export default function Projects() {
                           Clear Filters
                         </Button>
                       ) : (
-                        <NewProjectDialog onProjectCreated={handleProjectCreated} />
+                        <ProjectWizard onProjectCreated={handleProjectCreated} />
                       )
                     }
                   />
