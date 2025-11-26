@@ -14,7 +14,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import {
-  ArrowLeft,
   ExternalLink,
   Copy,
   AlertTriangle,
@@ -37,31 +36,18 @@ import {
   Server,
 } from "lucide-react"
 import { Link, useParams, useNavigate } from "react-router-dom"
-import { ProtectedRoute } from "@/components/protected-route"
+import { ProtectedRoute } from "@/components/ProtectedRoute"
 import { useCVE, useMatchCVE, useDeleteCVE } from "@/lib/hooks/useCVEs"
 import { CommentSection } from "@/components/comments"
+import { BackButton } from "@/components/navigation"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
+import { getSeverityColor, formatDateTime, getRelativeTime } from "@/lib/style-utils"
 
-// Helper functions
-const getSeverityColor = (severity: string) => {
-  switch (severity) {
-    case "critical":
-      return "border-red-600 bg-red-50 text-red-700 dark:text-red-400 dark:bg-red-950"
-    case "high":
-      return "border-orange-500 bg-orange-50 text-orange-700 dark:text-orange-400 dark:bg-orange-950"
-    case "medium":
-      return "border-yellow-500 bg-yellow-50 text-yellow-700 dark:text-yellow-400 dark:bg-yellow-950"
-    case "low":
-      return "border-blue-500 bg-blue-50 text-blue-700 dark:text-blue-400 dark:bg-blue-950"
-    default:
-      return "border-gray-500 bg-gray-50 text-gray-700 dark:text-gray-400 dark:bg-gray-950"
-  }
-}
-
+// Page-specific helper for severity gradients
 const getSeverityGradient = (severity: string) => {
-  switch (severity) {
+  switch (severity.toLowerCase()) {
     case "critical":
       return "from-red-500/10 to-red-600/10"
     case "high":
@@ -73,30 +59,6 @@ const getSeverityGradient = (severity: string) => {
     default:
       return "from-gray-500/10 to-gray-600/10"
   }
-}
-
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
-
-const getRelativeTime = (dateString: string) => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffDays === 0) return "Today"
-  if (diffDays === 1) return "Yesterday"
-  if (diffDays < 7) return `${diffDays} days ago`
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`
-  return `${Math.floor(diffDays / 365)} years ago`
 }
 
 export default function CVEDetails() {
@@ -178,12 +140,11 @@ export default function CVEDetails() {
       >
         <div className="space-y-6 animate-in fade-in-50 duration-500">
           {/* Back Button */}
-          <Link to="/cve-tracking">
-            <Button variant="ghost" size="sm" className="gap-2 -ml-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to CVE Tracking
-            </Button>
-          </Link>
+          <BackButton
+            href="/cve-tracking"
+            label="Back to CVE Tracking"
+            className="-ml-2"
+          />
 
           {/* Hero Header with Gradient Background */}
           <div className={cn(
@@ -341,11 +302,11 @@ export default function CVEDetails() {
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-1">
                           <p className="text-sm font-medium text-muted-foreground">Published Date</p>
-                          <p className="text-base font-semibold">{formatDate(cve.published_date)}</p>
+                          <p className="text-base font-semibold">{formatDateTime(cve.published_date)}</p>
                         </div>
                         <div className="space-y-1">
                           <p className="text-sm font-medium text-muted-foreground">Last Modified</p>
-                          <p className="text-base font-semibold">{formatDate(cve.last_modified_date)}</p>
+                          <p className="text-base font-semibold">{formatDateTime(cve.last_modified_date)}</p>
                         </div>
                       </div>
                     </CardContent>
@@ -576,7 +537,7 @@ export default function CVEDetails() {
                       <div className="flex-1 pb-4">
                         <p className="text-sm font-semibold">Published</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {formatDate(cve.published_date)}
+                          {formatDateTime(cve.published_date)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {getRelativeTime(cve.published_date)}
@@ -591,7 +552,7 @@ export default function CVEDetails() {
                       <div className="flex-1 pb-4">
                         <p className="text-sm font-semibold">Last Modified</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {formatDate(cve.last_modified_date)}
+                          {formatDateTime(cve.last_modified_date)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {getRelativeTime(cve.last_modified_date)}
@@ -605,7 +566,7 @@ export default function CVEDetails() {
                       <div className="flex-1">
                         <p className="text-sm font-semibold">Tracked Since</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {formatDate(cve.created_at)}
+                          {formatDateTime(cve.created_at)}
                         </p>
                       </div>
                     </div>
