@@ -11,7 +11,7 @@ export function DashboardLayout({ children, breadcrumbs }: DashboardLayoutProps)
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden lg:ml-64">
+      <div className="flex flex-1 flex-col overflow-hidden lg:ml-60">
         <Header breadcrumbs={breadcrumbs} />
         <main className="flex-1 overflow-y-auto bg-background p-6">{children}</main>
       </div>
