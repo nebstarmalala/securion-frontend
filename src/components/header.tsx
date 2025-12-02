@@ -14,6 +14,8 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import { Link } from "react-router-dom"
 import { GlobalSearch } from "@/components/global-search"
 import { NotificationBell } from "@/components/notifications"
+import { Breadcrumbs, KeyboardShortcutsHelp } from "@/components/navigation"
+import { useKeyboardNavigation } from "@/lib/hooks/useNavigation"
 
 interface HeaderProps {
   breadcrumbs?: { label: string; href?: string }[]
@@ -23,27 +25,17 @@ export function Header({ breadcrumbs }: HeaderProps) {
   const { theme, setTheme } = useTheme()
   const { user, logout } = useAuth()
 
+  // Enable keyboard navigation shortcuts
+  useKeyboardNavigation(true)
+
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-16 items-center gap-4 px-6">
-        {/* Breadcrumbs */}
+        {/* Breadcrumbs - Using new enhanced component */}
         {breadcrumbs && breadcrumbs.length > 0 && (
-          <nav className="hidden flex-1 md:flex">
-            <ol className="flex items-center gap-2 text-sm text-muted-foreground">
-              {breadcrumbs.map((crumb, index) => (
-                <li key={index} className="flex items-center gap-2">
-                  {index > 0 && <span>/</span>}
-                  {crumb.href ? (
-                    <Link to={crumb.href} className="hover:text-foreground transition-colors">
-                      {crumb.label}
-                    </Link>
-                  ) : (
-                    <span className="text-foreground font-medium">{crumb.label}</span>
-                  )}
-                </li>
-              ))}
-            </ol>
-          </nav>
+          <div className="flex-1">
+            <Breadcrumbs items={breadcrumbs} showHome={false} maxItems={5} />
+          </div>
         )}
 
         {/* Search */}
@@ -53,6 +45,9 @@ export function Header({ breadcrumbs }: HeaderProps) {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          {/* Keyboard shortcuts help */}
+          <KeyboardShortcutsHelp />
+
           {/* Notifications */}
           <NotificationBell />
 
