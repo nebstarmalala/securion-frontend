@@ -17,7 +17,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { NewProjectDialog } from "@/components/new-project-dialog"
+import { ProjectWizard } from "@/components/forms/ProjectWizard"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { cn } from "@/lib/utils"
 
@@ -111,7 +111,7 @@ export function QuickActions() {
         </CardContent>
       </Card>
 
-      <NewProjectDialog
+      <ProjectWizard
         open={projectDialogOpen}
         onOpenChange={setProjectDialogOpen}
       />
