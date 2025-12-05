@@ -48,6 +48,11 @@ class ProjectsService {
 
   /**
    * Assign users to project
+   * PUT /api/projects/{projectId}/assign-users
+   *
+   * @param projectId - The project UUID
+   * @param data - Object containing user_ids array and optional role
+   * @returns Updated project with assigned users
    */
   async assignUsers(projectId: string, data: AssignUsersInput): Promise<ApiProject> {
     const response = await apiClient.put<ApiResponse<ApiProject>>(`/projects/${projectId}/assign-users`, data)
@@ -116,10 +121,19 @@ class ProjectsService {
 
   /**
    * Remove user from project
+   * DELETE /api/projects/{projectId}/remove-user
+   *
+   * @param projectId - The project UUID
+   * @param userId - The user UUID to remove
+   * @returns Updated project without the removed user
    */
-  async removeUser(projectId: string, userId: string): Promise<void> {
-    await apiClient.delete<ApiResponse>(`/projects/${projectId}/remove-user`)
-    // Note: DELETE requests typically don't send body, pass userId as query param if needed
+  async removeUser(projectId: string, userId: string): Promise<ApiProject> {
+    // API expects user_id in the request body
+    const response = await apiClient.delete<ApiResponse<ApiProject>>(
+      `/projects/${projectId}/remove-user`,
+      { user_id: userId }
+    )
+    return response.data
   }
 
   /**
