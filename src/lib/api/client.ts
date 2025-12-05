@@ -236,7 +236,7 @@ class ApiClient {
    * Log API request (dev mode only)
    */
   private logRequest(method: string, url: string, body?: any): void {
-    if (LOG_API_CALLS && ENABLE_DEVTOOLS) {
+    if (LOG_API_CALLS && ENABLE_DEVTOOLS && import.meta.env.DEV) {
       console.group(`%c${method} ${url}`, "color: #0ea5e9; font-weight: bold")
       console.log("Timestamp:", new Date().toISOString())
       if (body) {
@@ -250,7 +250,7 @@ class ApiClient {
    * Log API response (dev mode only)
    */
   private logResponse(method: string, url: string, status: number, data: any): void {
-    if (LOG_API_CALLS && ENABLE_DEVTOOLS) {
+    if (LOG_API_CALLS && ENABLE_DEVTOOLS && import.meta.env.DEV) {
       const color = status >= 200 && status < 300 ? "#10b981" : "#ef4444"
       console.group(`%c${method} ${url} [${status}]`, `color: ${color}; font-weight: bold`)
       console.log("Timestamp:", new Date().toISOString())
@@ -362,7 +362,7 @@ class ApiClient {
           // If rate limited and retry-after is provided, wait that duration
           if (error.status === 429 && error.retryAfter) {
             const delay = error.retryAfter * 1000
-            if (LOG_API_CALLS && ENABLE_DEVTOOLS) {
+            if (LOG_API_CALLS && ENABLE_DEVTOOLS && import.meta.env.DEV) {
               console.warn(`Rate limited. Retrying after ${error.retryAfter}s...`)
             }
             await new Promise((resolve) => setTimeout(resolve, delay))
@@ -373,7 +373,7 @@ class ApiClient {
         // Exponential backoff for other errors
         if (attempt < maxRetries) {
           const delay = initialDelay * Math.pow(2, attempt)
-          if (LOG_API_CALLS && ENABLE_DEVTOOLS) {
+          if (LOG_API_CALLS && ENABLE_DEVTOOLS && import.meta.env.DEV) {
             console.warn(`Request failed. Retrying in ${delay}ms... (Attempt ${attempt + 1}/${maxRetries})`)
           }
           await new Promise((resolve) => setTimeout(resolve, delay))
@@ -477,16 +477,18 @@ class ApiClient {
 
   /**
    * DELETE request
+   * Some API endpoints require passing data in the request body for DELETE
    */
-  async delete<T = any>(endpoint: string): Promise<T> {
+  async delete<T = any>(endpoint: string, body?: any): Promise<T> {
     const url = `${this.baseURL}${endpoint}`
-    this.logRequest("DELETE", url)
+    this.logRequest("DELETE", url, body)
 
     return this.retryRequest<T>(
       async () =>
         this.fetchWithTimeout(url, {
           method: "DELETE",
           headers: await this.getHeaders(),
+          body: body ? JSON.stringify(body) : undefined,
         }),
       "DELETE",
       url,
