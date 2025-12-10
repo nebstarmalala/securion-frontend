@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/dashboard-layout"
-import { ProtectedRoute } from "@/components/protected-route"
+import { ProtectedRoute } from "@/components/ProtectedRoute"
 import { CVECard } from "@/components/cve-card"
 import { EmptyState } from "@/components/empty-state"
 import { Input } from "@/components/ui/input"
