@@ -13,7 +13,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu"
 import {
-  ArrowLeft,
   MoreVertical,
   Copy,
   ExternalLink,
@@ -35,38 +34,23 @@ import {
   Zap,
 } from "lucide-react"
 import { Link, useParams, useNavigate } from "react-router-dom"
-import { ProtectedRoute } from "@/components/protected-route"
+import { ProtectedRoute } from "@/components/ProtectedRoute"
 import { FindingFormDialog } from "@/components/finding-form-dialog"
 import { CommentSection } from "@/components/comments"
 import { AttachmentSection } from "@/components/attachments"
 import { ActivityFeed } from "@/components/activity"
+import { BackButton, QuickJump } from "@/components/navigation"
 import { useFinding, useUpdateFindingStatus, useDeleteFinding, useFindingActivities } from "@/lib/hooks/useFindings"
 import { projectsService, scopesService } from "@/lib/api"
 import type { ApiProject, ApiScope, ApiFinding } from "@/lib/types/api"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { getSeverityColor, getFindingStatusColor, formatDate, getRelativeTime } from "@/lib/style-utils"
 
-// Helper functions for styling
-const getSeverityColor = (severity: string) => {
-  switch (severity) {
-    case "critical":
-      return "border-red-600 bg-red-50 text-red-700 dark:text-red-400 dark:bg-red-950"
-    case "high":
-      return "border-orange-500 bg-orange-50 text-orange-700 dark:text-orange-400 dark:bg-orange-950"
-    case "medium":
-      return "border-yellow-500 bg-yellow-50 text-yellow-700 dark:text-yellow-400 dark:bg-yellow-950"
-    case "low":
-      return "border-blue-500 bg-blue-50 text-blue-700 dark:text-blue-400 dark:bg-blue-950"
-    case "info":
-      return "border-gray-500 bg-gray-50 text-gray-700 dark:text-gray-400 dark:bg-gray-950"
-    default:
-      return ""
-  }
-}
-
+// Page-specific helper for severity gradients
 const getSeverityGradient = (severity: string) => {
-  switch (severity) {
+  switch (severity.toLowerCase()) {
     case "critical":
       return "from-red-500/10 to-red-600/10"
     case "high":
@@ -80,44 +64,6 @@ const getSeverityGradient = (severity: string) => {
     default:
       return "from-gray-500/10 to-gray-600/10"
   }
-}
-
-const getFindingStatusColor = (status: string) => {
-  switch (status) {
-    case "open":
-      return "text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-950 dark:border-red-900"
-    case "confirmed":
-      return "text-orange-600 bg-orange-50 border-orange-200 dark:text-orange-400 dark:bg-orange-950 dark:border-orange-900"
-    case "fixed":
-      return "text-green-600 bg-green-50 border-green-200 dark:text-green-400 dark:bg-green-950 dark:border-green-900"
-    case "false-positive":
-      return "text-gray-600 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-950 dark:border-gray-900"
-    case "accepted":
-      return "text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-950 dark:border-blue-900"
-    default:
-      return ""
-  }
-}
-
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  })
-}
-
-const getRelativeTime = (dateString: string) => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`
-  if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`
-  return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`
 }
 
 const formatVulnerabilityType = (type: string) => {
@@ -173,7 +119,6 @@ export default function FindingDetails() {
         setProject(projectData)
         setScope(scopeData)
       }).catch(err => {
-        console.error("Error fetching project/scope data:", err)
         toast.error("Failed to load project data")
       })
     }
@@ -250,13 +195,20 @@ export default function FindingDetails() {
         ]}
       >
         <div className="space-y-6 animate-in fade-in-50 duration-500">
-          {/* Back Button */}
-          <Link to={`/projects/${id}/scopes/${scopeId}`}>
-            <Button variant="ghost" size="sm" className="gap-2 -ml-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Scope
-            </Button>
-          </Link>
+          {/* Navigation - Back Button and Quick Jump */}
+          <div className="flex items-center justify-between">
+            <BackButton
+              href={`/projects/${id}/scopes/${scopeId}`}
+              contextName={scope?.name || "Scope"}
+              className="-ml-2"
+            />
+            <QuickJump
+              additionalTargets={[
+                { label: scope?.name || "Scope", href: `/projects/${id}/scopes/${scopeId}`, type: "scope" },
+                { label: project?.name || "Project", href: `/projects/${id}`, type: "project" },
+              ]}
+            />
+          </div>
 
           {/* Hero Header with Gradient Background */}
           <div className={cn(
