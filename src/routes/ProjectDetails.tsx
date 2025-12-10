@@ -22,62 +22,12 @@ import type { ApiProject, ApiScope, ApiFinding } from "@/lib/types/api"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/contexts/auth-context"
-
-// Helper functions for styling
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "active":
-      return "border-green-500 text-green-700 dark:text-green-400"
-    case "planning":
-      return "border-blue-500 text-blue-700 dark:text-blue-400"
-    case "on-hold":
-      return "border-yellow-500 text-yellow-700 dark:text-yellow-400"
-    case "completed":
-      return "border-gray-500 text-gray-700 dark:text-gray-400"
-    case "cancelled":
-      return "border-red-500 text-red-700 dark:text-red-400"
-    default:
-      return ""
-  }
-}
-
-const getSeverityColor = (severity: string) => {
-  switch (severity) {
-    case "critical":
-      return "border-red-600 text-red-700 dark:text-red-400"
-    case "high":
-      return "border-orange-500 text-orange-700 dark:text-orange-400"
-    case "medium":
-      return "border-yellow-500 text-yellow-700 dark:text-yellow-400"
-    case "low":
-      return "border-blue-500 text-blue-700 dark:text-blue-400"
-    case "info":
-      return "border-gray-500 text-gray-700 dark:text-gray-400"
-    default:
-      return ""
-  }
-}
-
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  })
-}
-
-const getRelativeTime = (dateString: string) => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`
-  if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`
-  return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`
-}
+import {
+  getProjectStatusColor as getStatusColor,
+  getSeverityColor,
+  formatDate,
+  getRelativeTime,
+} from "@/lib/style-utils"
 
 interface FindingCounts {
   critical: number
@@ -168,7 +118,6 @@ export default function ProjectDetails() {
         })
       }
     } catch (err) {
-      console.error("Error fetching project data:", err)
       setError(err instanceof Error ? err.message : "Failed to load project data")
       toast.error("Failed to load project", {
         description: err instanceof Error ? err.message : "An error occurred",
@@ -190,7 +139,6 @@ export default function ProjectDetails() {
       toast.success("Project deleted successfully")
       navigate("/projects")
     } catch (err) {
-      console.error("Error deleting project:", err)
       toast.error("Failed to delete project", {
         description: err instanceof Error ? err.message : "An error occurred",
       })
