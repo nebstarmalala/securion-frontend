@@ -1,15 +1,37 @@
+/**
+ * Reports Page
+ *
+ * Displays all reports with filtering, generation, and export capabilities.
+ * Integrated with real API endpoints.
+ */
+
+import { useState } from "react"
+import { Link } from "react-router-dom"
+import {
+  FileText,
+  Plus,
+  Download,
+  RefreshCw,
+  Search,
+  Eye,
+  FileType,
+} from "lucide-react"
 import { DashboardLayout } from "@/components/dashboard-layout"
-import { ProtectedRoute } from "@/components/protected-route"
+import { ProtectedRoute } from "@/components/ProtectedRoute"
 import { EmptyState } from "@/components/empty-state"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
-import { mockReports, getUserById } from "@/lib/mock-data"
-import { FileText, Download, Eye, Search, Filter, RefreshCw } from "lucide-react"
-import { Link } from "react-router-dom"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,45 +40,95 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useState } from "react"
-import { toast } from "sonner"
+import {
+  ReportCard,
+  GenerateReportDialog,
+  ReportStatusList,
+  SaveReportTemplateDialog,
+  ExportDialog,
+} from "@/components/reports"
+import {
+  useReports,
+  useDeleteReport,
+  useDownloadReport,
+  useSavedReportTemplates,
+  useDeleteSavedReportTemplate,
+} from "@/lib/hooks/useReports"
+import type { Report, SavedReportTemplate } from "@/lib/types"
+import type { ReportFilters } from "@/lib/api/reports"
 
 export default function ReportsPage() {
+  const [activeTab, setActiveTab] = useState("reports")
+  const [filters, setFilters] = useState<ReportFilters>({})
   const [searchQuery, setSearchQuery] = useState("")
-  const [typeFilter, setTypeFilter] = useState("all")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [loading, setLoading] = useState(false)
+  const [showGenerateDialog, setShowGenerateDialog] = useState(false)
+  const [showExportDialog, setShowExportDialog] = useState(false)
+  const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<SavedReportTemplate | null>(null)
 
-  // Filter reports
-  const filteredReports = mockReports.filter((report) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      report.projectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      report.client.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesType = typeFilter === "all" || report.reportType === typeFilter
-    const matchesStatus = statusFilter === "all" || report.status === statusFilter
-    return matchesSearch && matchesType && matchesStatus
-  })
+  // Queries
+  const {
+    data: reportsData,
+    isLoading: reportsLoading,
+    refetch: refetchReports,
+  } = useReports(filters)
+  const {
+    data: templatesData,
+    isLoading: templatesLoading,
+    refetch: refetchTemplates,
+  } = useSavedReportTemplates()
 
-  const handleDownload = (reportId: string, format: string) => {
-    toast.success(`Downloading report as ${format.toUpperCase()}`, {
-      description: "Your download will begin shortly",
+  // Mutations
+  const deleteReport = useDeleteReport()
+  const downloadReport = useDownloadReport()
+  const deleteTemplate = useDeleteSavedReportTemplate()
+
+  // Filter reports by search query
+  const filteredReports =
+    reportsData?.data.filter(
+      (report) =>
+        report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        report.project_name.toLowerCase().includes(searchQuery.toLowerCase())
+    ) || []
+
+  // Separate reports by status
+  const activeReports = filteredReports.filter(
+    (r) => r.status === "pending" || r.status === "generating"
+  )
+  const completedReports = filteredReports.filter((r) => r.status === "completed")
+  const failedReports = filteredReports.filter((r) => r.status === "failed")
+
+  const handleDownload = async (report: Report) => {
+    await downloadReport.mutateAsync({
+      reportId: report.id,
+      filename: `${report.title}.${report.format}`,
     })
   }
 
-  const handleGenerateReport = () => {
-    toast.info("Report generation coming soon", {
-      description: "This feature will be available once the API is implemented",
-    })
+  const handleDeleteReport = async (reportId: string) => {
+    await deleteReport.mutateAsync(reportId)
+  }
+
+  const handleEditTemplate = (template: SavedReportTemplate) => {
+    setEditingTemplate(template)
+    setShowSaveTemplateDialog(true)
+  }
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    await deleteTemplate.mutateAsync(templateId)
   }
 
   const handleRefresh = () => {
-    setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      toast.success("Reports refreshed successfully")
-    }, 1000)
+    refetchReports()
+    refetchTemplates()
   }
+
+  const clearFilters = () => {
+    setFilters({})
+    setSearchQuery("")
+  }
+
+  const hasActiveFilters = searchQuery || filters.report_type || filters.format || filters.status
 
   return (
     <ProtectedRoute>
@@ -65,292 +137,408 @@ export default function ReportsPage() {
           {/* Header */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Reports Gallery</h1>
-              <p className="text-muted-foreground mt-1">Access and download penetration testing reports</p>
+              <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
+              <p className="text-muted-foreground mt-1">
+                Generate, manage, and export reports for your projects
+              </p>
             </div>
             <div className="flex gap-2">
-              {!loading && (
-                <Button variant="outline" size="sm" onClick={handleRefresh}>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Refresh
-                </Button>
-              )}
-              <Button onClick={handleGenerateReport}>
-                <FileText className="mr-2 h-4 w-4" />
-                Generate New Report
+              <Button variant="outline" size="sm" onClick={handleRefresh}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh
+              </Button>
+              <Button variant="outline" onClick={() => setShowExportDialog(true)}>
+                <Download className="h-4 w-4 mr-2" />
+                Export Data
+              </Button>
+              <Button onClick={() => setShowGenerateDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Generate Report
               </Button>
             </div>
           </div>
 
-          {/* Filters */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col gap-4 sm:flex-row">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Search reports..."
-                    className="pl-9"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    disabled={loading}
-                  />
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList>
+              <TabsTrigger value="reports" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Reports
+                {reportsData && (
+                  <Badge variant="secondary" className="ml-1">
+                    {reportsData.data.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="templates" className="flex items-center gap-2">
+                <FileType className="h-4 w-4" />
+                Templates
+                {templatesData && (
+                  <Badge variant="secondary" className="ml-1">
+                    {templatesData.data.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Reports Tab */}
+            <TabsContent value="reports" className="space-y-4">
+              {/* Filters */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col gap-4 sm:flex-row">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Search reports..."
+                        className="pl-9"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+
+                    <Select
+                      value={filters.report_type || "all"}
+                      onValueChange={(value) =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          report_type: value === "all" ? undefined : (value as any),
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="w-full sm:w-[150px]">
+                        <SelectValue placeholder="All types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All types</SelectItem>
+                        <SelectItem value="executive">Executive</SelectItem>
+                        <SelectItem value="technical">Technical</SelectItem>
+                        <SelectItem value="compliance">Compliance</SelectItem>
+                        <SelectItem value="custom">Custom</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Select
+                      value={filters.format || "all"}
+                      onValueChange={(value) =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          format: value === "all" ? undefined : (value as any),
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="w-full sm:w-[120px]">
+                        <SelectValue placeholder="Format" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All formats</SelectItem>
+                        <SelectItem value="pdf">PDF</SelectItem>
+                        <SelectItem value="docx">DOCX</SelectItem>
+                        <SelectItem value="html">HTML</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Select
+                      value={filters.status || "all"}
+                      onValueChange={(value) =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          status: value === "all" ? undefined : (value as any),
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="w-full sm:w-[140px]">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All statuses</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="generating">Generating</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="failed">Failed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Active Filters */}
+              {hasActiveFilters && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-muted-foreground">Active filters:</span>
+                  {searchQuery && (
+                    <Badge variant="secondary" className="gap-2">
+                      Search: {searchQuery}
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        className="hover:text-destructive"
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  )}
+                  {filters.report_type && (
+                    <Badge variant="secondary" className="gap-2">
+                      Type: {filters.report_type}
+                      <button
+                        onClick={() =>
+                          setFilters((prev) => ({ ...prev, report_type: undefined }))
+                        }
+                        className="hover:text-destructive"
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  )}
+                  {filters.format && (
+                    <Badge variant="secondary" className="gap-2">
+                      Format: {filters.format}
+                      <button
+                        onClick={() =>
+                          setFilters((prev) => ({ ...prev, format: undefined }))
+                        }
+                        className="hover:text-destructive"
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  )}
+                  {filters.status && (
+                    <Badge variant="secondary" className="gap-2">
+                      Status: {filters.status}
+                      <button
+                        onClick={() =>
+                          setFilters((prev) => ({ ...prev, status: undefined }))
+                        }
+                        className="hover:text-destructive"
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                    Clear all
+                  </Button>
                 </div>
-                <Select value={typeFilter} onValueChange={setTypeFilter} disabled={loading}>
-                  <SelectTrigger className="w-full sm:w-[180px]">
-                    <Filter className="mr-2 h-4 w-4" />
-                    <SelectValue placeholder="Report Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="executive">Executive</SelectItem>
-                    <SelectItem value="technical">Technical</SelectItem>
-                    <SelectItem value="compliance">Compliance</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={statusFilter} onValueChange={setStatusFilter} disabled={loading}>
-                  <SelectTrigger className="w-full sm:w-[180px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="final">Final</SelectItem>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
-                  </SelectContent>
-                </Select>
+              )}
+
+              {/* Active Reports (Generating) */}
+              {activeReports.length > 0 && (
+                <ReportStatusList
+                  reports={activeReports}
+                  onComplete={() => refetchReports()}
+                />
+              )}
+
+              {/* Reports List */}
+              {reportsLoading ? (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Card key={i}>
+                      <CardHeader>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 space-y-2">
+                            <Skeleton className="h-5 w-3/4" />
+                            <Skeleton className="h-3 w-1/2" />
+                          </div>
+                          <Skeleton className="h-6 w-16" />
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-9 w-full" />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : filteredReports.length === 0 ? (
+                <EmptyState
+                  icon={FileText}
+                  title={hasActiveFilters ? "No reports match your filters" : "No reports yet"}
+                  description={
+                    hasActiveFilters
+                      ? "Try adjusting your search criteria or filters"
+                      : "Generate your first penetration testing report to get started"
+                  }
+                  action={
+                    hasActiveFilters ? (
+                      <Button variant="outline" onClick={clearFilters}>
+                        Clear Filters
+                      </Button>
+                    ) : (
+                      <Button onClick={() => setShowGenerateDialog(true)}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        Generate Report
+                      </Button>
+                    )
+                  }
+                />
+              ) : (
+                <div className="space-y-6">
+                  {/* Completed Reports */}
+                  {completedReports.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-medium text-muted-foreground">
+                        Completed ({completedReports.length})
+                      </h3>
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {completedReports.map((report) => (
+                          <ReportCard
+                            key={report.id}
+                            report={report}
+                            onDownload={handleDownload}
+                            onDelete={handleDeleteReport}
+                            onView={(r) => {}}
+                            isDownloading={downloadReport.isPending}
+                            isDeleting={deleteReport.isPending}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Failed Reports */}
+                  {failedReports.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-medium text-destructive">
+                        Failed ({failedReports.length})
+                      </h3>
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {failedReports.map((report) => (
+                          <ReportCard
+                            key={report.id}
+                            report={report}
+                            onDelete={handleDeleteReport}
+                            isDeleting={deleteReport.isPending}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Templates Tab */}
+            <TabsContent value="templates" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Save your report configurations as templates for quick reuse
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEditingTemplate(null)
+                    setShowSaveTemplateDialog(true)
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Template
+                </Button>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Active Filters */}
-          {(typeFilter !== "all" || statusFilter !== "all" || searchQuery !== "") && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-muted-foreground">Active filters:</span>
-              {typeFilter !== "all" && (
-                <Badge variant="secondary" className="gap-2">
-                  Type: {typeFilter}
-                  <button onClick={() => setTypeFilter("all")} className="hover:text-destructive">
-                    ×
-                  </button>
-                </Badge>
-              )}
-              {statusFilter !== "all" && (
-                <Badge variant="secondary" className="gap-2">
-                  Status: {statusFilter}
-                  <button onClick={() => setStatusFilter("all")} className="hover:text-destructive">
-                    ×
-                  </button>
-                </Badge>
-              )}
-              {searchQuery !== "" && (
-                <Badge variant="secondary" className="gap-2">
-                  Search: {searchQuery}
-                  <button onClick={() => setSearchQuery("")} className="hover:text-destructive">
-                    ×
-                  </button>
-                </Badge>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setTypeFilter("all")
-                  setStatusFilter("all")
-                  setSearchQuery("")
-                }}
-              >
-                Clear all
-              </Button>
-            </div>
-          )}
-
-          {/* Loading State */}
-          {loading ? (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {[...Array(6)].map((_, i) => (
-                <Card key={i}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-5 w-3/4" />
-                        <Skeleton className="h-3 w-1/2" />
-                      </div>
-                      <Skeleton className="h-6 w-16" />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Skeleton className="h-10 w-10 rounded-lg" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-3 w-16" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-full" />
-                    </div>
-                    <div className="flex gap-2">
-                      <Skeleton className="h-9 flex-1" />
-                      <Skeleton className="h-9 w-32" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : filteredReports.length === 0 ? (
-            /* Empty State */
-            <EmptyState
-              icon={FileText}
-              title={
-                searchQuery || typeFilter !== "all" || statusFilter !== "all"
-                  ? "No reports match your filters"
-                  : "No reports yet"
-              }
-              description={
-                searchQuery || typeFilter !== "all" || statusFilter !== "all"
-                  ? "Try adjusting your search criteria or filters"
-                  : "Generate your first penetration testing report to get started"
-              }
-              action={
-                searchQuery || typeFilter !== "all" || statusFilter !== "all" ? (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setSearchQuery("")
-                      setTypeFilter("all")
-                      setStatusFilter("all")
-                    }}
-                  >
-                    Clear Filters
-                  </Button>
-                ) : (
-                  <Button onClick={handleGenerateReport}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Generate Report
-                  </Button>
-                )
-              }
-            />
-          ) : (
-            /* Reports Grid */
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {filteredReports.map((report) => {
-                const author = getUserById(report.generatedBy)
-                return (
-                  <Card key={report.id} className="group transition-all hover:shadow-lg hover:border-primary/50">
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 space-y-1">
-                          <CardTitle className="text-base line-clamp-1 group-hover:text-primary transition-colors">
-                            {report.projectName}
-                          </CardTitle>
-                          <CardDescription className="text-xs">{report.client}</CardDescription>
-                        </div>
-                        <Badge
-                          variant="outline"
-                          className={
-                            report.status === "final"
-                              ? "text-green-600 bg-green-50 border-green-200 dark:text-green-400 dark:bg-green-950 dark:border-green-900"
-                              : report.status === "draft"
-                                ? "text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-950 dark:border-amber-900"
-                                : "text-gray-600 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-950 dark:border-gray-900"
-                          }
-                        >
-                          {report.status}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                          <FileText className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium capitalize">{report.reportType} Report</p>
-                          <p className="text-xs text-muted-foreground">Version {report.version}</p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Total Findings</span>
-                          <span className="font-medium">{report.summary.totalFindings}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Risk Score</span>
-                          <Badge
-                            variant="outline"
-                            className={
-                              report.summary.riskScore >= 8
-                                ? "text-chart-1 bg-chart-1/10 border-chart-1/20"
-                                : report.summary.riskScore >= 6
-                                  ? "text-chart-2 bg-chart-2/10 border-chart-2/20"
-                                  : "text-chart-3 bg-chart-3/10 border-chart-3/20"
-                            }
-                          >
-                            {report.summary.riskScore}/10
+              {templatesLoading ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-[140px]" />
+                  ))}
+                </div>
+              ) : templatesData?.data.length === 0 ? (
+                <EmptyState
+                  icon={FileType}
+                  title="No templates yet"
+                  description="Save your report settings as templates for quick reuse"
+                  action={
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setEditingTemplate(null)
+                        setShowSaveTemplateDialog(true)
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Template
+                    </Button>
+                  }
+                />
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {templatesData?.data.map((template) => (
+                    <Card
+                      key={template.id}
+                      className="hover:shadow-md transition-shadow"
+                    >
+                      <CardHeader className="pb-2">
+                        <div className="flex items-start justify-between">
+                          <CardTitle className="text-base">{template.name}</CardTitle>
+                          <Badge variant="outline" className="text-xs">
+                            {template.is_public ? "Public" : "Private"}
                           </Badge>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Generated</span>
-                          <span className="font-medium">{new Date(report.generatedDate).toLocaleDateString()}</span>
+                        {template.description && (
+                          <CardDescription className="line-clamp-2">
+                            {template.description}
+                          </CardDescription>
+                        )}
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="capitalize">{template.report_type}</span>
+                          <span>•</span>
+                          <span className="uppercase">{template.format}</span>
+                          <span>•</span>
+                          <span>Used {template.use_count}x</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">File Size</span>
-                          <span className="font-medium">{report.fileSize}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2 pt-2">
-                        <Link to={`/reports/${report.id}`} className="flex-1">
-                          <Button variant="outline" className="w-full bg-transparent" size="sm">
-                            <Eye className="mr-2 h-4 w-4" />
-                            View
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => handleEditTemplate(template)}
+                          >
+                            Edit
                           </Button>
-                        </Link>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="sm">
-                              <Download className="mr-2 h-4 w-4" />
-                              Download
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Export Format</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleDownload(report.id, "pdf")}>
-                              <FileText className="mr-2 h-4 w-4" />
-                              PDF Document
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDownload(report.id, "excel")}>
-                              <FileText className="mr-2 h-4 w-4" />
-                              Excel Spreadsheet
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDownload(report.id, "word")}>
-                              <FileText className="mr-2 h-4 w-4" />
-                              Word Document
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDownload(report.id, "html")}>
-                              <FileText className="mr-2 h-4 w-4" />
-                              HTML Report
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDownload(report.id, "json")}>
-                              <FileText className="mr-2 h-4 w-4" />
-                              JSON Data
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteTemplate(template.id)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+
+          {/* Dialogs */}
+          <GenerateReportDialog
+            open={showGenerateDialog}
+            onOpenChange={setShowGenerateDialog}
+            onSuccess={() => refetchReports()}
+          />
+
+          <ExportDialog
+            open={showExportDialog}
+            onOpenChange={setShowExportDialog}
+            onSuccess={() => {}}
+          />
+
+          <SaveReportTemplateDialog
+            open={showSaveTemplateDialog}
+            onOpenChange={setShowSaveTemplateDialog}
+            template={editingTemplate}
+            onSuccess={() => {
+              refetchTemplates()
+              setEditingTemplate(null)
+            }}
+          />
         </div>
       </DashboardLayout>
     </ProtectedRoute>
