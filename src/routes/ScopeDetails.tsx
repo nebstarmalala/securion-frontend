@@ -11,80 +11,18 @@ import { ArrowLeft, MoreVertical, Copy, Edit, AlertCircle } from "lucide-react"
 import { Link, useParams, useNavigate } from "react-router-dom"
 import { ScopeFormDialog } from "@/components/scope-form-dialog"
 import { FindingFormDialog } from "@/components/finding-form-dialog"
-import { ProtectedRoute } from "@/components/protected-route"
+import { ProtectedRoute } from "@/components/ProtectedRoute"
 import { projectsService, scopesService, findingsService } from "@/lib/api"
 import type { ApiProject, ApiScope, ApiFinding, ScopeService } from "@/lib/types/api"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
-
-// Helper functions for styling
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "in-scope":
-      return "border-green-500 text-green-700 dark:text-green-400"
-    case "out-of-scope":
-      return "border-red-500 text-red-700 dark:text-red-400"
-    case "pending":
-      return "border-yellow-500 text-yellow-700 dark:text-yellow-400"
-    default:
-      return ""
-  }
-}
-
-const getSeverityColor = (severity: string) => {
-  switch (severity) {
-    case "critical":
-      return "border-red-600 text-red-700 dark:text-red-400"
-    case "high":
-      return "border-orange-500 text-orange-700 dark:text-orange-400"
-    case "medium":
-      return "border-yellow-500 text-yellow-700 dark:text-yellow-400"
-    case "low":
-      return "border-blue-500 text-blue-700 dark:text-blue-400"
-    case "info":
-      return "border-gray-500 text-gray-700 dark:text-gray-400"
-    default:
-      return ""
-  }
-}
-
-const getFindingStatusColor = (status: string) => {
-  switch (status) {
-    case "open":
-      return "text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-950 dark:border-red-900"
-    case "confirmed":
-      return "text-orange-600 bg-orange-50 border-orange-200 dark:text-orange-400 dark:bg-orange-950 dark:border-orange-900"
-    case "fixed":
-      return "text-green-600 bg-green-50 border-green-200 dark:text-green-400 dark:bg-green-950 dark:border-green-900"
-    case "false-positive":
-      return "text-gray-600 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-950 dark:border-gray-900"
-    case "accepted":
-      return "text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-950 dark:border-blue-900"
-    default:
-      return ""
-  }
-}
-
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  })
-}
-
-const getRelativeTime = (dateString: string) => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`
-  if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`
-  return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`
-}
+import {
+  getScopeStatusColor as getStatusColor,
+  getSeverityColor,
+  getFindingStatusColor,
+  formatDate,
+  getRelativeTime,
+} from "@/lib/style-utils"
 
 const formatVulnerabilityType = (type: string) => {
   const typeMap: Record<string, string> = {
@@ -181,7 +119,6 @@ export default function ScopeDetails() {
       })
       setFindingCounts(counts)
     } catch (err) {
-      console.error("Error fetching scope data:", err)
       setError(err instanceof Error ? err.message : "Failed to load scope data")
       toast.error("Failed to load scope", {
         description: err instanceof Error ? err.message : "An error occurred",
@@ -199,7 +136,6 @@ export default function ScopeDetails() {
       toast.success("Scope deleted successfully")
       navigate(`/projects/${id}`)
     } catch (err) {
-      console.error("Error deleting scope:", err)
       toast.error("Failed to delete scope", {
         description: err instanceof Error ? err.message : "An error occurred",
       })
@@ -214,7 +150,6 @@ export default function ScopeDetails() {
       toast.success("Finding deleted successfully")
       fetchScopeData() // Refresh data
     } catch (err) {
-      console.error("Error deleting finding:", err)
       toast.error("Failed to delete finding", {
         description: err instanceof Error ? err.message : "An error occurred",
       })
