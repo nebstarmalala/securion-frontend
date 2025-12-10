@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { getReportById, getProjectById, getUserById, getSeverityColor } from "@/lib/mock-data"
-import { ArrowLeft, Download, FileText, Calendar, User, Building2, Shield, AlertTriangle } from "lucide-react"
+import { Download, FileText, Calendar, User, Building2, Shield, AlertTriangle } from "lucide-react"
 import { Link, useParams } from "react-router-dom"
 import {
   DropdownMenu,
@@ -14,7 +14,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ProtectedRoute } from "@/components/protected-route"
+import { ProtectedRoute } from "@/components/ProtectedRoute"
+import { BackButton } from "@/components/navigation"
 
 export default function ReportDetails() {
   const { id } = useParams<{ id: string }>()
@@ -34,12 +35,11 @@ export default function ReportDetails() {
           {/* Header */}
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
-              <Link to="/reports">
-                <Button variant="ghost" size="sm" className="gap-2 -ml-2 mb-2">
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Reports
-                </Button>
-              </Link>
+              <BackButton
+                href="/reports"
+                label="Back to Reports"
+                className="-ml-2 mb-2"
+              />
               <div className="flex items-center gap-3">
                 <h1 className="text-3xl font-bold tracking-tight">{report.projectName}</h1>
                 <Badge
