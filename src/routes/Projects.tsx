@@ -188,7 +188,7 @@ export default function Projects() {
                     }
                   />
                 ) : (
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                     {filterProjects(openProjects).map((project) => (
                       <ProjectCard key={project.id} project={project} />
                     ))}
@@ -223,7 +223,7 @@ export default function Projects() {
                     }
                   />
                 ) : (
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                     {filterProjects(completedProjects).map((project) => (
                       <ProjectCard key={project.id} project={project} />
                     ))}
