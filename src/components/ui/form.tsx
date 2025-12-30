@@ -12,6 +12,7 @@ import {
   type FieldPath,
   type FieldValues,
 } from 'react-hook-form'
+import { AlertCircle, CheckCircle2, Info } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { Label } from '@/components/ui/label'
@@ -80,7 +81,7 @@ function FormItem({ className, ...props }: React.ComponentProps<'div'>) {
     <FormItemContext.Provider value={{ id }}>
       <div
         data-slot="form-item"
-        className={cn('grid gap-2', className)}
+        className={cn('space-y-2', className)}
         {...props}
       />
     </FormItemContext.Provider>
@@ -89,18 +90,29 @@ function FormItem({ className, ...props }: React.ComponentProps<'div'>) {
 
 function FormLabel({
   className,
+  required,
   ...props
-}: React.ComponentProps<typeof LabelPrimitive.Root>) {
+}: React.ComponentProps<typeof LabelPrimitive.Root> & { required?: boolean }) {
   const { error, formItemId } = useFormField()
 
   return (
     <Label
       data-slot="form-label"
       data-error={!!error}
-      className={cn('data-[error=true]:text-destructive', className)}
+      className={cn(
+        'text-sm font-medium leading-none',
+        'transition-colors duration-200',
+        error && 'text-destructive',
+        className
+      )}
       htmlFor={formItemId}
       {...props}
-    />
+    >
+      {props.children}
+      {required && (
+        <span className="ml-1 text-destructive" aria-hidden="true">*</span>
+      )}
+    </Label>
   )
 }
 
@@ -129,29 +141,102 @@ function FormDescription({ className, ...props }: React.ComponentProps<'p'>) {
     <p
       data-slot="form-description"
       id={formDescriptionId}
-      className={cn('text-muted-foreground text-sm', className)}
+      className={cn(
+        'text-sm text-muted-foreground leading-relaxed',
+        className
+      )}
       {...props}
     />
   )
 }
 
-function FormMessage({ className, ...props }: React.ComponentProps<'p'>) {
+interface FormMessageProps extends React.ComponentProps<'div'> {
+  /** Show success message instead of error */
+  success?: boolean
+  /** Custom icon to display */
+  icon?: React.ReactNode
+}
+
+function FormMessage({
+  className,
+  success,
+  icon,
+  children,
+  ...props
+}: FormMessageProps) {
   const { error, formMessageId } = useFormField()
-  const body = error ? String(error?.message ?? '') : props.children
+  const body = error ? String(error?.message ?? '') : children
 
   if (!body) {
     return null
   }
 
+  const isSuccess = success && !error
+  const Icon = isSuccess ? CheckCircle2 : AlertCircle
+  const displayIcon = icon ?? <Icon className="size-4 shrink-0" />
+
   return (
-    <p
+    <div
       data-slot="form-message"
       id={formMessageId}
-      className={cn('text-destructive text-sm', className)}
+      role={error ? 'alert' : undefined}
+      className={cn(
+        'flex items-start gap-2 text-sm animate-in fade-in-0 slide-in-from-top-1 duration-200',
+        error && 'text-destructive',
+        isSuccess && 'text-green-600 dark:text-green-500',
+        className
+      )}
       {...props}
     >
-      {body}
+      {displayIcon}
+      <span className="leading-tight">{body}</span>
+    </div>
+  )
+}
+
+/** Helper text that appears below input, different from description */
+function FormHint({ className, icon, children, ...props }: React.ComponentProps<'p'> & { icon?: React.ReactNode }) {
+  return (
+    <p
+      data-slot="form-hint"
+      className={cn(
+        'flex items-center gap-1.5 text-xs text-muted-foreground',
+        className
+      )}
+      {...props}
+    >
+      {icon ?? <Info className="size-3" />}
+      {children}
     </p>
+  )
+}
+
+/** Character/word counter for inputs */
+function FormCounter({
+  current,
+  max,
+  className,
+  ...props
+}: React.ComponentProps<'span'> & { current: number; max: number }) {
+  const isNearLimit = current >= max * 0.9
+  const isOverLimit = current > max
+
+  return (
+    <span
+      data-slot="form-counter"
+      className={cn(
+        'text-xs tabular-nums transition-colors',
+        isOverLimit
+          ? 'text-destructive font-medium'
+          : isNearLimit
+            ? 'text-yellow-600 dark:text-yellow-500'
+            : 'text-muted-foreground',
+        className
+      )}
+      {...props}
+    >
+      {current}/{max}
+    </span>
   )
 }
 
@@ -164,4 +249,6 @@ export {
   FormDescription,
   FormMessage,
   FormField,
+  FormHint,
+  FormCounter,
 }

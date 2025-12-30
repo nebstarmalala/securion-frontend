@@ -2,15 +2,27 @@ import * as React from 'react'
 
 import { cn } from '@/lib/utils'
 
-function Table({ className, ...props }: React.ComponentProps<'table'>) {
+interface TableProps extends React.ComponentProps<'table'> {
+  /** Add striped rows */
+  striped?: boolean
+  /** Add hover effect on rows */
+  hoverable?: boolean
+}
+
+function Table({ className, striped, hoverable = true, ...props }: TableProps) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      className="relative w-full overflow-x-auto rounded-lg border"
     >
       <table
         data-slot="table"
-        className={cn('w-full caption-bottom text-sm', className)}
+        data-striped={striped}
+        data-hoverable={hoverable}
+        className={cn(
+          'w-full caption-bottom text-sm',
+          className
+        )}
         {...props}
       />
     </div>
@@ -21,7 +33,10 @@ function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
   return (
     <thead
       data-slot="table-header"
-      className={cn('[&_tr]:border-b', className)}
+      className={cn(
+        'bg-muted/50 [&_tr]:border-b',
+        className
+      )}
       {...props}
     />
   )
@@ -31,7 +46,12 @@ function TableBody({ className, ...props }: React.ComponentProps<'tbody'>) {
   return (
     <tbody
       data-slot="table-body"
-      className={cn('[&_tr:last-child]:border-0', className)}
+      className={cn(
+        '[&_tr:last-child]:border-0',
+        // Striped rows (when parent has data-striped)
+        '[[data-striped=true]_&_tr:nth-child(even)]:bg-muted/30',
+        className
+      )}
       {...props}
     />
   )
@@ -55,7 +75,11 @@ function TableRow({ className, ...props }: React.ComponentProps<'tr'>) {
     <tr
       data-slot="table-row"
       className={cn(
-        'hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors',
+        'border-b transition-colors duration-150',
+        // Hover effect (controlled by parent data-hoverable)
+        '[[data-hoverable=true]_&]:hover:bg-muted/50',
+        // Selected state
+        'data-[state=selected]:bg-primary/5 data-[state=selected]:border-primary/20',
         className,
       )}
       {...props}
@@ -68,7 +92,9 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
     <th
       data-slot="table-head"
       className={cn(
-        'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+        'h-11 px-4 text-left align-middle font-semibold text-muted-foreground',
+        'whitespace-nowrap text-xs uppercase tracking-wider',
+        '[&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
         className,
       )}
       {...props}
@@ -81,7 +107,8 @@ function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
     <td
       data-slot="table-cell"
       className={cn(
-        'p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+        'px-4 py-3 align-middle',
+        '[&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
         className,
       )}
       {...props}
@@ -102,6 +129,48 @@ function TableCaption({
   )
 }
 
+/** Empty state for tables */
+function TableEmpty({
+  className,
+  colSpan,
+  icon,
+  title = "No results found",
+  description,
+  action,
+  ...props
+}: React.ComponentProps<'tr'> & {
+  colSpan: number
+  icon?: React.ReactNode
+  title?: string
+  description?: string
+  action?: React.ReactNode
+}) {
+  return (
+    <tr
+      data-slot="table-empty"
+      className={cn(className)}
+      {...props}
+    >
+      <td colSpan={colSpan} className="py-12">
+        <div className="flex flex-col items-center justify-center gap-3 text-center">
+          {icon && (
+            <div className="text-muted-foreground/50">
+              {icon}
+            </div>
+          )}
+          <div className="space-y-1">
+            <p className="font-medium text-muted-foreground">{title}</p>
+            {description && (
+              <p className="text-sm text-muted-foreground/70">{description}</p>
+            )}
+          </div>
+          {action}
+        </div>
+      </td>
+    </tr>
+  )
+}
+
 export {
   Table,
   TableHeader,
@@ -111,4 +180,5 @@ export {
   TableRow,
   TableCell,
   TableCaption,
+  TableEmpty,
 }
