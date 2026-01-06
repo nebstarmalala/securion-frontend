@@ -3,7 +3,7 @@
  * Handles all HTTP requests with automatic token injection and error handling
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api/v1"
 const TOKEN_KEY = "securion_auth_token"
 const REFRESH_TOKEN_KEY = "securion_refresh_token"
 const TOKEN_EXPIRY_KEY = "securion_token_expiry"
@@ -496,11 +496,34 @@ class ApiClient {
   }
 
   /**
-   * Upload file (multipart/form-data)
+   * Upload file (multipart/form-data) with validation
+   * Validates file size (max 10MB) and allowed types before upload
    */
-  async upload<T = any>(endpoint: string, formData: FormData, onProgress?: (progress: number) => void): Promise<T> {
+  async upload<T = any>(
+    endpoint: string,
+    file: File,
+    additionalData?: Record<string, any>,
+    onProgress?: (progress: number) => void
+  ): Promise<T> {
+    // Validate file size (max 10MB)
+    const MAX_SIZE = 10 * 1024 * 1024
+    if (file.size > MAX_SIZE) {
+      throw new ApiError(422, 'File size exceeds 10MB limit')
+    }
+
+    // Validate file type
+    const ALLOWED_TYPES = [
+      'pdf', 'doc', 'docx', 'txt', 'md',
+      'jpg', 'jpeg', 'png', 'gif', 'svg',
+      'zip', 'tar', 'gz', 'xml', 'json', 'csv'
+    ]
+    const extension = file.name.split('.').pop()?.toLowerCase()
+    if (!extension || !ALLOWED_TYPES.includes(extension)) {
+      throw new ApiError(422, `File type .${extension} is not allowed`)
+    }
+
     const url = `${this.baseURL}${endpoint}`
-    this.logRequest("POST", url, { formData: "multipart/form-data" })
+    this.logRequest("POST", url, { file: file.name, size: file.size })
 
     const token = this.getToken()
     const headers: HeadersInit = {
@@ -511,6 +534,15 @@ class ApiClient {
       headers.Authorization = `Bearer ${token}`
     }
 
+    const formData = new FormData()
+    formData.append('file', file)
+
+    if (additionalData) {
+      Object.entries(additionalData).forEach(([key, value]) => {
+        formData.append(key, String(value))
+      })
+    }
+
     // Use XMLHttpRequest for upload progress tracking
     if (onProgress) {
       return new Promise<T>((resolve, reject) => {
@@ -518,32 +550,28 @@ class ApiClient {
 
         xhr.upload.addEventListener("progress", (e) => {
           if (e.lengthComputable) {
-            const progress = (e.loaded / e.total) * 100
+            const progress = Math.round((e.loaded / e.total) * 100)
             onProgress(progress)
           }
         })
 
         xhr.addEventListener("load", async () => {
           try {
-            const response = new Response(xhr.response, {
-              status: xhr.status,
-              statusText: xhr.statusText,
-              headers: new Headers(xhr.getAllResponseHeaders().split("\r\n").reduce((acc, line) => {
-                const [key, value] = line.split(": ")
-                if (key && value) acc[key] = value
-                return acc
-              }, {} as Record<string, string>)),
-            })
-
-            const result = await this.handleResponse<T>(response, "POST", url)
-            resolve(result)
+            if (xhr.status >= 200 && xhr.status < 300) {
+              const response = JSON.parse(xhr.responseText)
+              // Laravel backend returns { data, message }, extract data
+              resolve(response.data || response)
+            } else {
+              const error = JSON.parse(xhr.responseText)
+              reject(new ApiError(xhr.status, error.message, error.errors))
+            }
           } catch (error) {
             reject(error)
           }
         })
 
         xhr.addEventListener("error", () => {
-          reject(new ApiError(0, "Network error occurred"))
+          reject(new ApiError(0, "Network error occurred during upload"))
         })
 
         xhr.open("POST", url)
@@ -577,7 +605,7 @@ class ApiClient {
 
     const response = await fetch(url, {
       method: "GET",
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
     })
 
     if (!response.ok) {
