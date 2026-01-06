@@ -134,23 +134,29 @@ class AuthService {
 
   /**
    * Check if user has specific permission
-   * Super-admin automatically has ALL permissions
+   * Super-admin automatically has ALL permissions (via wildcard * or role)
    */
   hasPermission(user: ApiUser | null, permission: string): boolean {
     if (!user) return false
     // Super-admin has all permissions - bypass permission check
     if (this.isSuperAdmin(user)) return true
+    // Check for wildcard permission (*)
+    if (user.permissions.some((p: { name: string }) => p.name === '*')) return true
+    // Check for specific permission
     return user.permissions.some((p: { name: string }) => p.name === permission)
   }
 
   /**
    * Check if user has any of the specified permissions
-   * Super-admin automatically has ALL permissions
+   * Super-admin automatically has ALL permissions (via wildcard * or role)
    */
   hasAnyPermission(user: ApiUser | null, permissions: string[]): boolean {
     if (!user) return false
     // Super-admin has all permissions
     if (this.isSuperAdmin(user)) return true
+    // Check for wildcard permission
+    if (user.permissions.some((p: { name: string }) => p.name === '*')) return true
+    // Check for any specific permission
     return permissions.some((permission) =>
       user.permissions.some((p: { name: string }) => p.name === permission)
     )
@@ -158,28 +164,61 @@ class AuthService {
 
   /**
    * Check if user has all of the specified permissions
-   * Super-admin automatically has ALL permissions
+   * Super-admin automatically has ALL permissions (via wildcard * or role)
    */
   hasAllPermissions(user: ApiUser | null, permissions: string[]): boolean {
     if (!user) return false
     // Super-admin has all permissions
     if (this.isSuperAdmin(user)) return true
+    // Check for wildcard permission
+    if (user.permissions.some((p: { name: string }) => p.name === '*')) return true
+    // Check for all specific permissions
     return permissions.every((permission) =>
       user.permissions.some((p: { name: string }) => p.name === permission)
     )
   }
 
   /**
-   * Check if user can access a specific project
-   * Super-admin can access all projects
+   * Check if user can access a specific project with optional role requirement
+   * Super-admin can access all projects with all roles
    * Other users need project-view permission
+   *
+   * @param user - The user to check
+   * @param projectId - Optional project ID for project-specific checks
+   * @param requiredRole - Optional project-level role (lead, member, viewer)
+   *
+   * Note: Project-level role checking requires project team data.
+   * This will be fully implemented when project team management is added.
    */
-  canAccessProject(user: ApiUser | null, projectId?: string): boolean {
+  canAccessProject(
+    user: ApiUser | null,
+    projectId?: string,
+    requiredRole?: 'lead' | 'member' | 'viewer'
+  ): boolean {
     if (!user) return false
-    // Super-admin can access all projects
+
+    // Super-admin can access all projects with all roles
     if (this.isSuperAdmin(user)) return true
+
+    // Check for wildcard permission
+    if (user.permissions.some((p: { name: string }) => p.name === '*')) return true
+
     // Check if user has the project-view permission
-    return this.hasPermission(user, "project-view")
+    if (!this.hasPermission(user, "project-view")) return false
+
+    // TODO: Implement project-level role checking when project team data is available
+    // For now, if user has project-view permission, they can access
+    // Future implementation will check user's role within specific project:
+    // - lead: Full control over project
+    // - member: Can edit findings/scopes
+    // - viewer: Read-only access
+    if (requiredRole && projectId) {
+      // Placeholder: Will be implemented with project team management
+      // This would typically check the user's project_team relationship
+      return true
+    }
+
+    return true
   }
 }
 
