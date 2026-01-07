@@ -14,7 +14,7 @@ interface AuthContextType {
   hasRole: (role: string) => boolean
   hasAnyPermission: (permissions: string[]) => boolean
   hasAllPermissions: (permissions: string[]) => boolean
-  canAccessProject: (projectId?: string) => boolean
+  canAccessProject: (projectId?: string, requiredRole?: 'lead' | 'member' | 'viewer') => boolean
   isSuperAdmin: () => boolean
   isAdmin: () => boolean
   refreshUser: () => Promise<void>
@@ -135,10 +135,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   /**
-   * Check if user can access a specific project
+   * Check if user can access a specific project with optional role requirement
+   * @param projectId - Optional project ID for project-specific checks
+   * @param requiredRole - Optional project-level role (lead, member, viewer)
    */
-  const canAccessProject = (projectId?: string): boolean => {
-    return authService.canAccessProject(user, projectId)
+  const canAccessProject = (projectId?: string, requiredRole?: 'lead' | 'member' | 'viewer'): boolean => {
+    return authService.canAccessProject(user, projectId, requiredRole)
   }
 
   /**
