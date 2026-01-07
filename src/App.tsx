@@ -13,6 +13,7 @@ import { Suspense, lazy } from "react"
 
 // Lazy load routes
 const Dashboard = lazy(() => import("@/routes/Dashboard"))
+const DashboardV2 = lazy(() => import("@/routes/DashboardV2"))
 const Login = lazy(() => import("@/routes/Login"))
 const Projects = lazy(() => import("@/routes/Projects"))
 const ProjectDetails = lazy(() => import("@/routes/ProjectDetails"))
@@ -52,6 +53,7 @@ export default function App() {
 
                 {/* Protected routes - All wrapped with ProtectedRoute */}
                 <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/dashboard/v2" element={<ProtectedRoute><DashboardV2 /></ProtectedRoute>} />
                 <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
                 <Route path="/projects/:id" element={<ProtectedRoute requiredPermission="project-view"><ProjectDetails /></ProtectedRoute>} />
                 <Route path="/projects/:id/scopes/:scopeId" element={<ProtectedRoute requiredPermission="scope-view"><ScopeDetails /></ProtectedRoute>} />
